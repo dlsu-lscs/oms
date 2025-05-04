@@ -1,21 +1,15 @@
 export interface Event {
-  id: string;
+  id: number;
   arn: string;
-  name: string;
-  committee: string;
-  committeeId: number;
-  startTime: string;
-  endTime: string;
-  type: string;
-  nature: string;
+  event_name: string;
+  start: Date;
+  end: Date;
   duration: string;
-  eventVisual: string;
-  eventPostCaption: string;
-  attendanceForm: string;
-  preregistrationForm: string;
-  customLinks: { title: string; url: string }[];
-  createdAt: string;
-  updatedAt: string;
+  type: string;
+  committee?: string;
+  committeeId?: number;
+  nature?: string;
+  eventVisual?: string | null;
 }
 
 export interface Participant {

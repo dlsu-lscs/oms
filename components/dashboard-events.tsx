@@ -3,14 +3,13 @@
 import { useState } from "react";
 import EventCard from "@/components/event-card";
 import { EventSidebar } from "@/components/event-sheet";
-import { Event, Participant } from "@/app/types";
+import { Event } from "@/app/types";
 
 type EventListProps = {
   events: Event[];
-  participants: Participant[];
 };
 
-export default function EventList({ events, participants }: EventListProps) {
+export default function EventList({ events }: EventListProps) {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   return (
@@ -18,11 +17,11 @@ export default function EventList({ events, participants }: EventListProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {events.map((event) => (
           <EventCard
-            key={event.id}
-            imageSrc={event.eventVisual || "/placeholder.svg"}
+            key={event.arn}
+            imageSrc={event.eventVisual || null}
             altText="Event visual"
-            badgeText={event.committee}
-            title={event.name}
+            badgeText={event.committee || ""}
+            title={event.event_name || ""}
             deadlineText={`Pre-Acts deadline on [fill]`}
             onClick={() => setSelectedEvent(event)}
           />
@@ -32,11 +31,6 @@ export default function EventList({ events, participants }: EventListProps) {
       <EventSidebar
         open={!!selectedEvent}
         event={selectedEvent}
-        participants={
-          selectedEvent
-            ? participants.filter((p) => p.eventId === selectedEvent.id)
-            : []
-        }
         onOpenChange={(open) => {
           if (!open) setSelectedEvent(null);
         }}

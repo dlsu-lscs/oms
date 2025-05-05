@@ -48,13 +48,12 @@ export async function getCommitteeEvents(memberId: number): Promise<CommitteeEve
         e.start_time AS start,
         e.end_time AS end,
         ed.name AS duration,
-        e.type AS type,
-        e.project_heads AS project_heads
+        e.type AS type
       FROM events e
       JOIN committees c ON e.committee_id = c.committee_id
       JOIN event_durations ed ON e.duration_id = ed.id
       WHERE e.committee_id = ?
-      GROUP BY e.id, e.arn, e.name, e.start_time, e.end_time, ed.name, e.type, c.committee_name, e.project_heads
+      GROUP BY e.id, e.arn, e.name, e.start_time, e.end_time, ed.name, e.type, c.committee_name
       ORDER BY e.start_time`,
       [userCommittee[0].committee_id]
     ) as [EventQueryResult[], FieldPacket[]];

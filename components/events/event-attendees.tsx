@@ -13,8 +13,8 @@ interface EventAttendeesProps {
 const POSITION_BADGES = {
   null: {
     label: "Non-Member",
-    variant: "default" as const,
-    className: "bg-gray-100 text-gray-900",
+    variant: "outline" as const,
+    className: "border-white text-white",
   },
   MEM: {
     label: "Member",
@@ -85,9 +85,12 @@ export function EventAttendees({ event }: EventAttendeesProps) {
   return (
     <div className="space-y-4">
       {attendees.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          No attendees registered yet
-        </p>
+        <div className="text-center py-8">
+          <h3 className="text-lg font-medium">No attendees yet</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Attendees will appear here once they register.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {attendees.map((attendee) => {

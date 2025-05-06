@@ -15,6 +15,8 @@ import {
   IconSearch,
   IconSettings,
   IconUsers,
+  IconChevronDown,
+  IconUpload,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -29,7 +31,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navMain = [
   {
@@ -97,6 +107,7 @@ const documents = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
+  const [isOpen, setIsOpen] = React.useState(false);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/login" });
@@ -107,16 +118,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
+            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+              <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+                  className="data-[slot=sidebar-menu-button]:!p-1.5 flex items-center justify-between w-full"
             >
-              <Link href="/">
                 <span className="text-base font-semibold">
                   La Salle Computer Society
                 </span>
+                  <IconChevronDown className="w-4 h-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[200px]">
+                <DropdownMenuItem asChild>
+                  <Link href="/bulk-upload-events" className="flex items-center gap-2">
+                    <IconUpload className="w-4 h-4" />
+                    Start a new term
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center gap-2">
+                    <IconSettings className="w-4 h-4" />
+                    Organization Settings
               </Link>
-            </SidebarMenuButton>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

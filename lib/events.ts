@@ -5,8 +5,6 @@ export interface UserEvent {
   arn: string;
   event_name: string;
   committee: string;
-  start: Date;
-  end: Date;
   duration: string;
   type: string;
 }
@@ -15,8 +13,6 @@ interface UserEventQueryResult extends RowDataPacket {
   arn: string;
   event_name: string;
   committee: string;
-  start: string;
-  end: string;
   duration: string;
   type: string;
 }
@@ -28,8 +24,6 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
         e.arn AS 'arn',
         e.name AS 'event_name',
         ec.committee_name AS 'committee',
-        e.start_time AS 'start',
-        e.end_time AS 'end',
         ed.name AS 'duration',
         e.type AS 'type'
       FROM events e
@@ -45,8 +39,6 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
 
     return (rows as UserEventQueryResult[]).map(row => ({
       ...row,
-      start: new Date(row.start),
-      end: new Date(row.end)
     }));
   } catch (error) {
     console.error("Error fetching user events:", error);

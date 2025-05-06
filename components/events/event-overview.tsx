@@ -6,14 +6,81 @@ import { Event } from "@/app/types";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface EventOverviewProps {
   event: Event;
 }
 
+// Skeleton component for the event overview
+function EventOverviewSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div>
+            <Skeleton className="h-4 w-24 mb-1" />
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-4 w-4 mt-0.5" />
+              <div className="space-y-1">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Skeleton className="h-4 w-20 mb-1" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+
+          <div>
+            <Skeleton className="h-4 w-24 mb-1" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+          </div>
+
+          <div>
+            <Skeleton className="h-4 w-24 mb-1" />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Skeleton className="h-4 w-24 mb-1" />
+            <Skeleton className="aspect-[3/4] w-full rounded-lg" />
+          </div>
+
+          <div>
+            <Skeleton className="h-4 w-32 mb-1" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventOverview({ event }: EventOverviewProps) {
   const [projectHeads, setProjectHeads] = useState<{ full_name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [eventDates, setEventDates] = useState<{ start_time: Date; end_time: Date } | null>(null);
+  const [isLoadingDates, setIsLoadingDates] = useState(true);
 
   useEffect(() => {
     async function fetchProjectHeads() {
@@ -39,11 +106,43 @@ export function EventOverview({ event }: EventOverviewProps) {
       }
     }
 
+    async function fetchEventDates() {
+      if (!event?.arn) return;
+
+      setIsLoadingDates(true);
+      try {
+        const response = await fetch('/api/events/dates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ arn: event.arn }),
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch event dates');
+        const data = await response.json();
+        setEventDates(data);
+      } catch (error) {
+        console.error('Error fetching event dates:', error);
+      } finally {
+        setIsLoadingDates(false);
+      }
+    }
+
     fetchProjectHeads();
+    fetchEventDates();
   }, [event?.arn]);
 
-  const startDate = new Date(event.start);
-  const endDate = new Date(event.end);
+  if (isLoadingDates) {
+    return <EventOverviewSkeleton />;
+  }
+
+  if (!eventDates) {
+    return null;
+  }
+
+  const startDate = new Date(eventDates.start_time);
+  const endDate = new Date(eventDates.end_time);
 
   const formattedStartDate = startDate.toLocaleDateString("en-US", {
     weekday: "long",
@@ -106,9 +205,15 @@ export function EventOverview({ event }: EventOverviewProps) {
               Project Heads
             </h3>
             {isLoading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <p className="text-sm text-muted-foreground">Loading...</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
               </div>
             ) : projectHeads.length > 0 ? (
               <div className="space-y-1.5">
@@ -156,7 +261,7 @@ export function EventOverview({ event }: EventOverviewProps) {
             <h3 className="font-medium text-sm text-muted-foreground mb-1">
               Event Post Caption
             </h3>
-            <p className="text-sm">event.event_post_caption</p>
+            <p className="text-sm">{event.event_post_caption}</p>
           </div>
         </div>
       </div>

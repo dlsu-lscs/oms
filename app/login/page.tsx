@@ -19,7 +19,7 @@ export default function LoginPage() {
       {/* Left side - Image */}
       <div className="hidden lg:flex w-1/2 relative">
         <Image
-          src="/placeholder.svg"
+          src="/login.gif"
           alt="Login"
           fill
           className="object-cover"

@@ -46,38 +46,54 @@ const POSITION_BADGES = {
 export function EventAttendees({ event }: EventAttendeesProps) {
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAttendees = async () => {
+    if (!event?.arn) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/events/attendees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ arn: event.arn }),
+      });
+      if (!response.ok) throw new Error('Failed to fetch attendees');
+      const data = await response.json();
+      setAttendees(data);
+    } catch (error) {
+      setError('Failed to load attendees.');
+      setAttendees([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchAttendees() {
-      if (!event?.arn) return;
-      
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/events/attendees', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ arn: event.arn }),
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch attendees');
-        const data = await response.json();
-        setAttendees(data);
-      } catch (error) {
-        console.error('Error fetching attendees:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     fetchAttendees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.arn]);
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <h3 className="text-lg font-medium text-red-500">{error}</h3>
+        <button
+          className="mt-4 px-4 py-2 rounded bg-primary text-white hover:bg-primary/90"
+          onClick={fetchAttendees}
+        >
+          Reload
+        </button>
       </div>
     );
   }

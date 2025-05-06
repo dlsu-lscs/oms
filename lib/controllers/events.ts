@@ -6,8 +6,6 @@ export interface UserEvent {
   arn: string;
   event_name: string;
   committee: string;
-  start: Date;
-  end: Date;
   duration: string;
   type: string;
 }
@@ -17,8 +15,6 @@ interface UserEventQueryResult extends RowDataPacket {
   arn: string;
   event_name: string;
   committee: string;
-  start: string;
-  end: string;
   duration: string;
   type: string;
 }
@@ -38,8 +34,6 @@ export interface Event {
   arn: string;
   event_name: string;
   committee: string;
-  start: Date;
-  end: Date;
   duration: string;
   type: string;
   nature: string;
@@ -52,14 +46,22 @@ interface EventQueryResult extends RowDataPacket {
   committee: string;
   arn: string;
   event_name: string;
-  start: string;
-  end: string;
   duration: string;
   type: string;
   nature: string;
   event_visual: string | null;
   event_post_caption: string | null;
   project_heads: string | null;
+}
+
+export interface EventDates {
+  start_time: Date;
+  end_time: Date;
+}
+
+interface EventDatesQueryResult extends RowDataPacket {
+  start_time: Date;
+  end_time: Date;
 }
 
 export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
@@ -70,8 +72,6 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
         e.arn AS 'arn',
         e.name AS 'event_name',
         ec.committee_name AS 'committee',
-        e.start_time AS 'start',
-        e.end_time AS 'end',
         ed.name AS 'duration',
         e.type AS 'type'
       FROM events e
@@ -86,9 +86,7 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
     ) as [UserEventQueryResult[], FieldPacket[]];
 
     return (rows as UserEventQueryResult[]).map(row => ({
-      ...row,
-      start: new Date(row.start),
-      end: new Date(row.end)
+      ...row
     }));
   } catch (error) {
     console.error("Error fetching user events:", error);
@@ -142,8 +140,6 @@ export async function getEvents(): Promise<Event[]> {
         c.committee_name AS committee, 
         e.arn AS arn,
         e.name AS event_name,
-        e.start_time AS start,
-        e.end_time AS end,
         ed.name AS duration,
         e.type AS type,
         e.nature AS nature,
@@ -153,14 +149,12 @@ export async function getEvents(): Promise<Event[]> {
       FROM events e
       JOIN committees c ON e.committee_id = c.committee_id
       JOIN event_durations ed ON e.duration_id = ed.id
-      GROUP BY e.id, e.arn, e.name, e.start_time, e.end_time, ed.name, e.type, e.nature, e.event_visual, e.event_post_caption, e.project_heads, c.committee_name
-      ORDER BY e.start_time`
+      GROUP BY e.id, e.arn, e.name, ed.name, e.type, e.nature, e.event_visual, e.event_post_caption, e.project_heads, c.committee_name
+      ORDER BY e.arn`
     ) as [EventQueryResult[], FieldPacket[]];
 
     return (rows as EventQueryResult[]).map(row => ({
       ...row,
-      start: new Date(row.start),
-      end: new Date(row.end),
       eventVisual: row.event_visual || undefined,
       event_post_caption: row.event_post_caption || undefined,
       project_heads: row.project_heads || undefined
@@ -168,5 +162,29 @@ export async function getEvents(): Promise<Event[]> {
   } catch (error) {
     console.error("Error fetching events:", error);
     return [];
+  }
+}
+
+export async function getEventDates(arn: string): Promise<EventDates | null> {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT ed.start_time, ed.end_time 
+       FROM event_dates ed
+       JOIN events e ON ed.event_id = e.id
+       WHERE e.arn = ?`,
+      [arn]
+    ) as [EventDatesQueryResult[], FieldPacket[]];
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return {
+      start_time: new Date(rows[0].start_time),
+      end_time: new Date(rows[0].end_time)
+    };
+  } catch (error) {
+    console.error("Error fetching event dates:", error);
+    return null;
   }
 } 

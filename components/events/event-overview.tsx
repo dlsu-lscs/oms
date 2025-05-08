@@ -1,12 +1,18 @@
 "use client";
 
-import { CalendarDays, Clock, User } from "lucide-react";
+import { CalendarDays, Clock, User, MapPin, Wallet, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Event } from "@/app/types";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface EventOverviewProps {
   event: Event;
@@ -167,6 +173,13 @@ export function EventOverview({ event }: EventOverviewProps) {
         <div className="space-y-4">
           <div>
             <h3 className="font-medium text-sm text-muted-foreground mb-1">
+              Brief Description
+            </h3>
+            <p className="text-sm">{event.brief_description}</p>
+          </div>
+
+          <div>
+            <h3 className="font-medium text-sm text-muted-foreground mb-1">
               Date & Time
             </h3>
             <div className="flex items-start gap-2">
@@ -182,23 +195,25 @@ export function EventOverview({ event }: EventOverviewProps) {
 
           <div>
             <h3 className="font-medium text-sm text-muted-foreground mb-1">
-              Duration
+              Venue
             </h3>
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <p>{event.duration}</p>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <p>{event.venue || 'Online'}</p>
             </div>
           </div>
 
-          <div>
-            <h3 className="font-medium text-sm text-muted-foreground mb-1">
-              Type & Nature
-            </h3>
-            <div className="flex gap-2">
-              <Badge variant="secondary">{event.type}</Badge>
-              <Badge variant="outline">{event.nature}</Badge>
+          {event.budget_allocation && event.budget_allocation > 0 && (
+            <div>
+              <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                Budget Allocation
+              </h3>
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <p>₱{event.budget_allocation.toLocaleString()}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <h3 className="font-medium text-sm text-muted-foreground mb-1">
@@ -228,6 +243,53 @@ export function EventOverview({ event }: EventOverviewProps) {
               <p className="text-sm text-muted-foreground">No project heads assigned</p>
             )}
           </div>
+
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="details">
+              <AccordionTrigger className="text-sm font-medium text-muted-foreground">
+                Additional Details
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                    Duration
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <p>{event.duration}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                    Goals
+                  </h3>
+                  <p className="text-sm">{event.goals}</p>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                    Objectives
+                  </h3>
+                  <p className="text-sm">{event.objectives}</p>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                    Strategies
+                  </h3>
+                  <p className="text-sm">{event.strategies}</p>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                    Measures
+                  </h3>
+                  <p className="text-sm">{event.measures}</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
 
         <div className="space-y-4">

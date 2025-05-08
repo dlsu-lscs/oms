@@ -10,6 +10,14 @@ export interface Event {
   committeeId?: number;
   nature?: string;
   eventVisual?: string | null;
+  venue?: string;
+  budget_allocation?: number;
+  brief_description?: string;
+  goals?: string;
+  objectives?: string;
+  strategies?: string;
+  measures?: string;
+  event_post_caption?: string;
 }
 
 export interface Participant {

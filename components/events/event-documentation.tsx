@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, CheckCircle, Loader2, Circle, CircleCheck } from "lucide-react";
+import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle } from "lucide-react";
 import { Event } from "@/app/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MultiselectDropdown } from "@/components/ui/MultiselectDropdown";
@@ -31,30 +31,48 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
     prereg: string;
   } | null>(null);
   const [preActsTemplates, setPreActsTemplates] = useState<{ label: string; value: string; url: string }[]>([]);
-  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [postActsTemplates, setPostActsTemplates] = useState<{ label: string; value: string; url: string }[]>([]);
+  const [selectedPreActsTemplates, setSelectedPreActsTemplates] = useState<string[]>([]);
+  const [selectedPostActsTemplates, setSelectedPostActsTemplates] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [stepperSteps, setStepperSteps] = useState<any[] | null>(null);
   const [folderId, setFolderId] = useState<string | null>(null);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
-  const DRIVE_FOLDER_ID = "1wk2ZMP3KhuIp1O4KFpi324_3LTaIiRFQ";
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchFiles() {
       try {
         setIsLoadingFiles(true);
-        const res = await fetch("/api/drive-folder-files", {
+        setError(null);
+
+        // Fetch Pre-Acts templates
+        const preActsRes = await fetch("/api/drive-templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folderId: DRIVE_FOLDER_ID }),
+          body: JSON.stringify({ type: "pre-acts" }),
         });
-        const data = await res.json();
-        if (res.ok && data.files) {
+        const preActsData = await preActsRes.json();
+        if (preActsRes.ok && preActsData.files) {
           setPreActsTemplates(
-            data.files.map((f: any) => ({ label: f.name, value: f.id, url: f.url }))
+            preActsData.files.map((f: any) => ({ label: f.name, value: f.id, url: f.url }))
+          );
+        }
+
+        // Fetch Post-Acts templates
+        const postActsRes = await fetch("/api/drive-templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "post-acts" }),
+        });
+        const postActsData = await postActsRes.json();
+        if (postActsRes.ok && postActsData.files) {
+          setPostActsTemplates(
+            postActsData.files.map((f: any) => ({ label: f.name, value: f.id, url: f.url }))
           );
         }
       } catch (err) {
-        // Optionally handle error
+        setError("Failed to load templates");
       } finally {
         setIsLoadingFiles(false);
       }
@@ -75,40 +93,46 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
     navigator.clipboard.writeText(text);
   };
 
-  const handleCheckboxChange = (label: string) => {
-    setSelectedTemplates((prev) => {
-      if (prev.includes(label)) {
-        return prev.filter((l) => l !== label);
-      } else {
-        return [...prev, label];
-      }
-    });
-  };
-
   const handleGenerateFolder = async () => {
-    const templateUrls = preActsTemplates
-      .filter((t) => selectedTemplates.includes(t.value))
+    const preActsUrls = preActsTemplates
+      .filter((t) => selectedPreActsTemplates.includes(t.value))
       .map((t) => t.url);
-    if (!event?.event_name || templateUrls.length === 0) {
-      alert("Please select at least one template.");
+    
+    const postActsUrls = postActsTemplates
+      .filter((t) => selectedPostActsTemplates.includes(t.value))
+      .map((t) => t.url);
+
+    if (!event?.event_name || (preActsUrls.length === 0 && postActsUrls.length === 0)) {
+      setError("Please select at least one template.");
       return;
     }
+
     setIsGenerating(true);
+    setError(null);
     setStepperSteps([
+      { label: "Finding committee folder", status: "pending", message: "" },
+      { label: "Finding term folder", status: "pending", message: "" },
       { label: "Create new folder", status: "pending", message: "" },
-      ...templateUrls.map((url) => ({ label: `Create file: ${url}`, status: "pending", message: "" })),
+      ...preActsUrls.map((url) => ({ label: `Create Pre-Acts file: ${url}`, status: "pending", message: "" })),
+      ...postActsUrls.map((url) => ({ label: `Create Post-Acts file: ${url}`, status: "pending", message: "" })),
       { label: "Complete! Click here to access drive.", status: "pending", message: "" }
     ]);
+
     try {
       const res = await fetch("/api/generate-activity-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventName: event.event_name, templateUrls }),
+        body: JSON.stringify({ 
+          eventName: event.event_name,
+          committee: event.committee,
+          preActsUrls,
+          postActsUrls
+        }),
       });
       const data = await res.json();
+      
       if (res.ok && data.steps) {
         setFolderId(data.folderId);
-        // Animate stepper: update one step at a time
         let i = 0;
         const animateSteps = async () => {
           for (; i < data.steps.length; i++) {
@@ -124,11 +148,11 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
         };
         animateSteps();
       } else {
-        alert(`Error: ${data.error}`);
+        setError(data.error || "Failed to generate folder");
         setStepperSteps(null);
       }
     } catch (err: any) {
-      alert("An unexpected error occurred.");
+      setError("An unexpected error occurred.");
       setStepperSteps(null);
     } finally {
       setIsGenerating(false);
@@ -137,6 +161,13 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700">
+          <AlertCircle className="h-4 w-4" />
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
       {isLoadingFiles ? (
         <PreActsTemplatesSkeleton />
       ) : (
@@ -149,11 +180,11 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
                 const isDone = step.status === "success";
                 const isError = step.status === "error";
                 const isFinal = step.label.includes("Complete!");
-                // If step is a file creation, show badge with file name
                 let fileBadge = null;
                 if (step.label.startsWith("Create file:")) {
                   const fileUrl = step.label.replace("Create file: ", "").trim();
-                  const file = preActsTemplates.find(f => f.url === fileUrl || f.value === fileUrl || fileUrl.includes(f.value));
+                  const file = preActsTemplates.find(f => f.url === fileUrl || f.value === fileUrl || fileUrl.includes(f.value)) ||
+                             postActsTemplates.find(f => f.url === fileUrl || f.value === fileUrl || fileUrl.includes(f.value));
                   if (file) {
                     fileBadge = (
                       <Badge className="bg-white text-black border border-border text-xs px-2 py-0.5">{file.label}</Badge>
@@ -188,12 +219,24 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
           ) : (
             <>
               <div className="space-y-4">
-                <MultiselectDropdown
-                  options={preActsTemplates}
-                  value={selectedTemplates}
-                  onChange={setSelectedTemplates}
-                  placeholder="Select Pre-Acts documents..."
-                />
+                <div>
+                  <Label className="mb-2 block">Pre-Acts Documents</Label>
+                  <MultiselectDropdown
+                    options={preActsTemplates}
+                    value={selectedPreActsTemplates}
+                    onChange={setSelectedPreActsTemplates}
+                    placeholder="Select Pre-Acts documents..."
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2 block">Post-Acts Documents</Label>
+                  <MultiselectDropdown
+                    options={postActsTemplates}
+                    value={selectedPostActsTemplates}
+                    onChange={setSelectedPostActsTemplates}
+                    placeholder="Select Post-Acts documents..."
+                  />
+                </div>
               </div>
               <Button variant="outline" size="sm" className="mt-6" onClick={handleGenerateFolder} disabled={isGenerating}>
                 {isGenerating ? "Generating..." : "Generate Activity Folder"}

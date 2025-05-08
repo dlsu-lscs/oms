@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
+import { pool } from '@/lib/db'
 
 // API route to bulk upload events via Google Sheets
 export async function POST(req: NextRequest) {
@@ -8,6 +9,15 @@ export async function POST(req: NextRequest) {
     if (!sheetUrl) {
       return NextResponse.json({ error: 'sheetUrl is required' }, { status: 400 })
     }
+
+    // Fetch existing ARNs and valid event natures
+    const [existingArns, validNatures] = await Promise.all([
+      pool.query('SELECT arn FROM events'),
+      pool.query('SELECT name FROM event_natures')
+    ]);
+
+    const arns = (existingArns[0] as any[]).map(row => row.arn);
+    const natures = (validNatures[0] as any[]).map(row => row.name);
 
     // Extract spreadsheetId from URL
     let spreadsheetId: string
@@ -23,8 +33,19 @@ export async function POST(req: NextRequest) {
     const tabName = sheetName || 'Sheet1'
 
     // Decode service account JSON from env
-    const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}')
+    let serviceAccount
+    try {
+      serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}')
+    } catch (error) {
+      console.error('Error parsing service account JSON:', error)
+      return NextResponse.json({ error: 'Invalid service account JSON format' }, { status: 500 })
+    }
+
     if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      console.error('Missing required service account fields:', {
+        hasClientEmail: !!serviceAccount.client_email,
+        hasPrivateKey: !!serviceAccount.private_key
+      })
       return NextResponse.json({ error: 'Invalid service account credentials' }, { status: 500 })
     }
 
@@ -35,6 +56,7 @@ export async function POST(req: NextRequest) {
       serviceAccount.private_key,
       ['https://www.googleapis.com/auth/spreadsheets.readonly']
     )
+
     const sheets = google.sheets({ version: 'v4', auth })
 
     // Fetch entire sheet values
@@ -51,6 +73,7 @@ export async function POST(req: NextRequest) {
     // Required column names (must match exactly)
     const requiredFields = [
       'Activity Title',
+      'ARN',
       'Duration',
       'Brief Description',
       'Goals',
@@ -92,8 +115,14 @@ export async function POST(req: NextRequest) {
     // Note: Please share your Google Sheet with the service account email:
     //    ${serviceAccount.client_email}
 
-    return NextResponse.json({ success: true, data: parsed })
+    return NextResponse.json({ 
+      success: true, 
+      data: parsed,
+      existingArns: arns,
+      validNatures: natures
+    })
   } catch (e) {
+    console.error('Error parsing sheet:', e)
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
 } 

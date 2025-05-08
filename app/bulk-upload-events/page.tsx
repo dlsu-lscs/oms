@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileSpreadsheet, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
+import UploadStepper from '@/components/UploadStepper';
 
 interface Member {
   id: number;
@@ -30,6 +31,7 @@ interface Committee {
 
 interface Event {
   'Activity Title': string;
+  'ARN': string;
   Duration: string;
   'Target Activity Date': string[];
   'Activity Nature': string;
@@ -42,7 +44,8 @@ interface Event {
   Strategies: string;
   Measures: string;
   'Project Head': string[];
-  [key: string]: string | string[];
+  'Committee': string;
+  [key: string]: string | string[] | undefined;
 }
 
 export default function BulkUploadEventsPage() {
@@ -56,11 +59,21 @@ export default function BulkUploadEventsPage() {
   const [viewMode, setViewMode] = React.useState<"table" | "compact">("compact");
   const [members, setMembers] = useState<Member[]>([]);
   const [committees, setCommittees] = useState<Committee[]>([]);
+  const [existingArns, setExistingArns] = useState<string[]>([]);
+  const [validNatures, setValidNatures] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadErrors, setUploadErrors] = useState<Array<{ index: number; error: string }>>([]);
+  const [showStepper, setShowStepper] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Array<{ index: number; error: string }>>([]);
+  const [isValid, setIsValid] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setIsLoading(true);
+
     try {
       if (sheetNames.length === 0) {
         // First step: fetch sheet/tab names
@@ -78,6 +91,14 @@ export default function BulkUploadEventsPage() {
         setSelectedSheet(result.sheetNames[0] || "");
         toast({ title: "Sheets Loaded", description: `Found ${result.sheetNames.length} sheets.` });
       } else {
+        // Store the current state of Project Heads, Committee, and Dates
+        const currentState = parsedData.map(event => ({
+          arn: event['ARN'],
+          projectHeads: event['Project Head'],
+          committee: event['Committee'],
+          dates: event['Target Activity Date']
+        }));
+
         // Second step: parse and upload selected sheet
         const response = await fetch("/api/bulk-upload-events", {
           method: "POST",
@@ -88,11 +109,31 @@ export default function BulkUploadEventsPage() {
         if (!response.ok) {
           throw new Error(result.error || "Failed to upload events");
         }
-        const dataWithArrays = result.data.map((event: Event) => ({
-          ...event,
-          'Project Head': Array.isArray(event['Project Head']) ? event['Project Head'] : event['Project Head'] ? [event['Project Head']] : []
-        }));
-        setParsedData(dataWithArrays || []);
+
+        // Update ARNs and valid natures
+        setExistingArns(result.existingArns || []);
+        setValidNatures(result.validNatures || []);
+
+        // Merge the new data with the preserved state
+        const mergedData = result.data.map((newEvent: Event) => {
+          const preservedState = currentState.find(state => state.arn === newEvent['ARN']);
+          if (preservedState) {
+            return {
+              ...newEvent,
+              'Project Head': preservedState.projectHeads,
+              'Committee': preservedState.committee,
+              'Target Activity Date': preservedState.dates
+            };
+          }
+          return {
+            ...newEvent,
+            'Project Head': [],
+            'Committee': '',
+            'Target Activity Date': []
+          };
+        });
+
+        setParsedData(mergedData);
         toast({ title: "Success", description: `Imported ${result.data.length} rows.` });
       }
     } catch (error) {
@@ -207,10 +248,10 @@ export default function BulkUploadEventsPage() {
       if (index === eventIndex) {
         // If committeeId is 0, it means we're removing the committee
         if (committeeId === 0) {
-          return { ...event, 'Committee': [] };
+          return { ...event, 'Committee': '' };
         }
         // Otherwise, set the new committee
-        return { ...event, 'Committee': [committeeId.toString()] };
+        return { ...event, 'Committee': committeeId.toString() };
       }
       return event;
     }));
@@ -233,6 +274,122 @@ export default function BulkUploadEventsPage() {
       }
       return event;
     }));
+  };
+
+  const validateEvents = async () => {
+    setIsValidating(true);
+    setValidationErrors([]);
+    setShowStepper(true);
+
+    try {
+      const response = await fetch('/api/bulk-upload-events/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: parsedData }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setValidationErrors(result.errors || []);
+        toast({
+          title: 'Validation Failed',
+          description: result.error || 'Failed to validate events',
+          variant: 'destructive',
+        });
+        setIsValid(false);
+      } else {
+        setIsValid(true);
+        toast({
+          title: 'Validation Successful',
+          description: 'All events are valid and ready to be uploaded',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+      setIsValid(false);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!parsedData.length) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadErrors([]);
+    setShowStepper(true);
+
+    try {
+      const response = await fetch('/api/bulk-upload-events/insert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: parsedData }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setUploadErrors(result.errors || []);
+        toast({
+          title: 'Upload Failed',
+          description: result.error || 'Failed to upload events',
+          variant: 'destructive',
+        });
+      } else {
+        // Update errors with eventIds from successful uploads
+        const updatedErrors = result.errors?.map((error: any) => ({
+          ...error,
+          eventId: result.results?.find((r: any) => r.index === error.index)?.eventId
+        })) || [];
+        setUploadErrors(updatedErrors);
+
+        toast({
+          title: 'Success',
+          description: `Successfully uploaded ${parsedData.length} events`,
+        });
+        // Only reset the upload progress and errors, keep the stepper visible
+        setUploadProgress(parsedData.length);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    try {
+      const response = await fetch('/api/bulk-upload-events/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: parsedData }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send notification email');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Notification email sent successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -286,113 +443,162 @@ export default function BulkUploadEventsPage() {
                       {errorMessage}
                     </p>
                   )}
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="sheet-url">Google Sheet URL</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="sheet-url"
-                          placeholder="https://docs.google.com/spreadsheets/d/..."
-                          value={sheetUrl}
-                          onChange={(e) => setSheetUrl(e.target.value)}
-                          className="w-full"
-                          disabled={sheetNames.length > 0}
-                        />
-                        {sheetNames.length > 0 && (
-                          <Select
-                            value={selectedSheet}
-                            onValueChange={setSelectedSheet}
-                          >
-                            <SelectTrigger className="w-[200px]">
-                              <SelectValue placeholder="Choose sheet" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {sheetNames.map((name) => (
-                                <SelectItem key={name} value={name}>
-                                  {name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                      {sheetNames.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          The sheet should contain all the required fields listed above. Make sure the column headers match exactly.
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                      disabled={isLoading || !sheetUrl || (sheetNames.length > 0 && !selectedSheet)}
-                    >
-                      {isLoading ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          {sheetNames.length === 0 ? "Loading Sheets..." : "Fetching Events..."}
-                        </>
-                      ) : sheetNames.length === 0 ? (
-                        "Load Sheets"
-                      ) : (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          {parsedData.length > 0 ? "Refresh Events" : "Upload Events"}
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                  {parsedData.length > 0 && (
-                    <div className="mt-6">
-                      <Tabs defaultValue="compact" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="compact">Compact View</TabsTrigger>
-                          <TabsTrigger value="table">Table View</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="compact" className="mt-4">
-                          <CompactEventList 
-                            events={parsedData} 
-                            members={members}
-                            committees={committees}
-                            onProjectHeadChange={handleProjectHeadChange}
-                            onCommitteeChange={handleCommitteeChange}
-                            onDateChange={handleDateChange}
-                            onDateRemove={handleDateRemove}
-                          />
-                        </TabsContent>
-                        <TabsContent value="table" className="mt-4">
-                          <div className="overflow-auto">
-                            <table className="w-full divide-y divide-border whitespace-normal break-words">
-                              <thead className="bg-muted/50">
-                                <tr>
-                                  {columns.map((col) => (
-                                    <th
-                                      key={col}
-                                      className="px-2 py-1 text-left text-xs font-medium text-muted-foreground border-r border-border last:border-r-0"
-                                    >
-                                      {col}
-                                    </th>
+                  {!showStepper ? (
+                    <>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="sheet-url">Google Sheet URL</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="sheet-url"
+                              placeholder="https://docs.google.com/spreadsheets/d/..."
+                              value={sheetUrl}
+                              onChange={(e) => setSheetUrl(e.target.value)}
+                              className="w-full"
+                              disabled={sheetNames.length > 0}
+                            />
+                            {sheetNames.length > 0 && (
+                              <Select
+                                value={selectedSheet}
+                                onValueChange={setSelectedSheet}
+                              >
+                                <SelectTrigger className="w-[200px]">
+                                  <SelectValue placeholder="Choose sheet" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {sheetNames.map((name) => (
+                                    <SelectItem key={name} value={name}>
+                                      {name}
+                                    </SelectItem>
                                   ))}
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border bg-background">
-                                {parsedData.map((row, rowIndex) => (
-                                  <tr key={rowIndex} className="hover:bg-muted/50">
-                                    {columns.map((col) => (
-                                      <td
-                                        key={col}
-                                        className="px-2 py-1 text-xs text-foreground border-r border-border last:border-r-0"
-                                      >
-                                        {row[col] || '-'}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
-                        </TabsContent>
-                      </Tabs>
+                          {sheetNames.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              The sheet should contain all the required fields listed above. Make sure the column headers match exactly.
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                          disabled={isLoading || !sheetUrl || (sheetNames.length > 0 && !selectedSheet)}
+                        >
+                          {isLoading ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              {sheetNames.length === 0 ? "Loading Sheets..." : "Fetching Events..."}
+                            </>
+                          ) : sheetNames.length === 0 ? (
+                            "Load Sheets"
+                          ) : (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              {parsedData.length > 0 ? "Refresh Events" : "Upload Events"}
+                            </>
+                          )}
+                        </Button>
+                      </form>
+                      {parsedData.length > 0 && (
+                        <div className="mt-6">
+                          <Tabs defaultValue="compact" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                              <TabsTrigger value="compact">Compact View</TabsTrigger>
+                              <TabsTrigger value="table">Table View</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="compact" className="mt-4">
+                              <CompactEventList 
+                                events={parsedData} 
+                                members={members}
+                                committees={committees}
+                                onProjectHeadChange={handleProjectHeadChange}
+                                onCommitteeChange={handleCommitteeChange}
+                                onDateChange={handleDateChange}
+                                onDateRemove={handleDateRemove}
+                                existingArns={existingArns}
+                                validNatures={validNatures}
+                                onUpload={handleUpload}
+                              />
+                            </TabsContent>
+                            <TabsContent value="table" className="mt-4">
+                              <div className="overflow-auto">
+                                <table className="w-full divide-y divide-border whitespace-normal break-words">
+                                  <thead className="bg-muted/50">
+                                    <tr>
+                                      {columns.map((col) => (
+                                        <th
+                                          key={col}
+                                          className="px-2 py-1 text-left text-xs font-medium text-muted-foreground border-r border-border last:border-r-0"
+                                        >
+                                          {col}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border bg-background">
+                                    {parsedData.map((row, rowIndex) => (
+                                      <tr key={rowIndex} className="hover:bg-muted/50">
+                                        {columns.map((col) => (
+                                          <td
+                                            key={col}
+                                            className="px-2 py-1 text-xs text-foreground border-r border-border last:border-r-0"
+                                          >
+                                            {row[col] || '-'}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="mt-6">
+                      <UploadStepper
+                        totalEvents={parsedData.length}
+                        currentIndex={uploadProgress}
+                        errors={isValidating ? validationErrors : uploadErrors}
+                        isUploading={isValidating || isUploading}
+                        events={parsedData}
+                        onSendEmail={handleSendEmail}
+                      />
+                      {!isUploading && !isValidating && (
+                        <div className="mt-6 flex justify-end gap-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowStepper(false);
+                              setUploadProgress(0);
+                              setUploadErrors([]);
+                              setValidationErrors([]);
+                              setIsValid(false);
+                            }}
+                          >
+                            Back to Events
+                          </Button>
+                          {!isValid ? (
+                            <Button
+                              onClick={validateEvents}
+                              className="bg-primary text-primary-foreground hover:bg-primary/90"
+                            >
+                              Validate Events
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={handleUpload}
+                              className="bg-primary text-primary-foreground hover:bg-primary/90"
+                            >
+                              Upload Events
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>

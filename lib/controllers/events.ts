@@ -8,6 +8,14 @@ export interface UserEvent {
   committee: string;
   duration: string;
   type: string;
+  nature: string;
+  venue: string;
+  budget_allocation: number;
+  brief_description: string;
+  goals: string;
+  objectives: string;
+  strategies: string;
+  measures: string;
 }
 
 interface UserEventQueryResult extends RowDataPacket {
@@ -17,6 +25,14 @@ interface UserEventQueryResult extends RowDataPacket {
   committee: string;
   duration: string;
   type: string;
+  nature: string;
+  venue: string;
+  budget_allocation: number;
+  brief_description: string;
+  goals: string;
+  objectives: string;
+  strategies: string;
+  measures: string;
 }
 
 export interface ProjectHead {
@@ -40,6 +56,13 @@ export interface Event {
   eventVisual?: string;
   event_post_caption?: string;
   project_heads?: string;
+  venue?: string;
+  budget_allocation?: number;
+  brief_description?: string;
+  goals?: string;
+  objectives?: string;
+  strategies?: string;
+  measures?: string;
 }
 
 interface EventQueryResult extends RowDataPacket {
@@ -52,6 +75,13 @@ interface EventQueryResult extends RowDataPacket {
   event_visual: string | null;
   event_post_caption: string | null;
   project_heads: string | null;
+  venue: string | null;
+  budget_allocation: number | null;
+  brief_description: string | null;
+  goals: string | null;
+  objectives: string | null;
+  strategies: string | null;
+  measures: string | null;
 }
 
 export interface EventDates {
@@ -73,10 +103,19 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
         e.name AS 'event_name',
         ec.committee_name AS 'committee',
         ed.name AS 'duration',
-        e.type AS 'type'
+        e.type AS 'type',
+        en.name AS 'nature',
+        e.venue AS 'venue',
+        e.budget_allocation AS 'budget_allocation',
+        e.brief_description AS 'brief_description',
+        e.goals AS 'goals',
+        e.objectives AS 'objectives',
+        e.strategies AS 'strategies',
+        e.measures AS 'measures'
       FROM events e
       JOIN event_heads eh ON e.id = eh.event_id
       JOIN event_durations ed ON e.duration_id = ed.id
+      JOIN event_natures en ON e.nature_id = en.id
       JOIN committees ec ON e.committee_id = ec.committee_id
       JOIN members m ON eh.member_id = m.id
       JOIN positions p ON m.position_id = p.position_id
@@ -142,14 +181,25 @@ export async function getEvents(): Promise<Event[]> {
         e.name AS event_name,
         ed.name AS duration,
         e.type AS type,
-        e.nature AS nature,
+        en.name AS nature,
         e.event_visual AS event_visual,
         e.event_post_caption AS event_post_caption,
-        e.project_heads AS project_heads
+        e.project_heads AS project_heads,
+        e.venue AS venue,
+        e.budget_allocation AS budget_allocation,
+        e.brief_description AS brief_description,
+        e.goals AS goals,
+        e.objectives AS objectives,
+        e.strategies AS strategies,
+        e.measures AS measures
       FROM events e
       JOIN committees c ON e.committee_id = c.committee_id
+      JOIN event_natures en ON e.nature_id = en.id
       JOIN event_durations ed ON e.duration_id = ed.id
-      GROUP BY e.id, e.arn, e.name, ed.name, e.type, e.nature, e.event_visual, e.event_post_caption, e.project_heads, c.committee_name
+      GROUP BY e.id, e.arn, e.name, ed.name, e.type, en.name, e.event_visual, 
+               e.event_post_caption, e.project_heads, c.committee_name, e.venue,
+               e.budget_allocation, e.brief_description, e.goals, e.objectives,
+               e.strategies, e.measures
       ORDER BY e.arn`
     ) as [EventQueryResult[], FieldPacket[]];
 
@@ -157,7 +207,14 @@ export async function getEvents(): Promise<Event[]> {
       ...row,
       eventVisual: row.event_visual || undefined,
       event_post_caption: row.event_post_caption || undefined,
-      project_heads: row.project_heads || undefined
+      project_heads: row.project_heads || undefined,
+      venue: row.venue || undefined,
+      budget_allocation: row.budget_allocation || undefined,
+      brief_description: row.brief_description || undefined,
+      goals: row.goals || undefined,
+      objectives: row.objectives || undefined,
+      strategies: row.strategies || undefined,
+      measures: row.measures || undefined
     }));
   } catch (error) {
     console.error("Error fetching events:", error);

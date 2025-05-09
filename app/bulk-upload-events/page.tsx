@@ -445,116 +445,116 @@ export default function BulkUploadEventsPage() {
                   )}
                   {!showStepper ? (
                     <>
-                      <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="sheet-url">Google Sheet URL</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="sheet-url"
-                              placeholder="https://docs.google.com/spreadsheets/d/..."
-                              value={sheetUrl}
-                              onChange={(e) => setSheetUrl(e.target.value)}
-                              className="w-full"
-                              disabled={sheetNames.length > 0}
-                            />
-                            {sheetNames.length > 0 && (
-                              <Select
-                                value={selectedSheet}
-                                onValueChange={setSelectedSheet}
-                              >
-                                <SelectTrigger className="w-[200px]">
-                                  <SelectValue placeholder="Choose sheet" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {sheetNames.map((name) => (
-                                    <SelectItem key={name} value={name}>
-                                      {name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                          {sheetNames.length === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              The sheet should contain all the required fields listed above. Make sure the column headers match exactly.
-                            </p>
-                          )}
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                          disabled={isLoading || !sheetUrl || (sheetNames.length > 0 && !selectedSheet)}
-                        >
-                          {isLoading ? (
-                            <>
-                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                              {sheetNames.length === 0 ? "Loading Sheets..." : "Fetching Events..."}
-                            </>
-                          ) : sheetNames.length === 0 ? (
-                            "Load Sheets"
-                          ) : (
-                            <>
-                              <RefreshCw className="mr-2 h-4 w-4" />
-                              {parsedData.length > 0 ? "Refresh Events" : "Upload Events"}
-                            </>
-                          )}
-                        </Button>
-                      </form>
-                      {parsedData.length > 0 && (
-                        <div className="mt-6">
-                          <Tabs defaultValue="compact" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                              <TabsTrigger value="compact">Compact View</TabsTrigger>
-                              <TabsTrigger value="table">Table View</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="compact" className="mt-4">
-                              <CompactEventList 
-                                events={parsedData} 
-                                members={members}
-                                committees={committees}
-                                onProjectHeadChange={handleProjectHeadChange}
-                                onCommitteeChange={handleCommitteeChange}
-                                onDateChange={handleDateChange}
-                                onDateRemove={handleDateRemove}
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="sheet-url">Google Sheet URL</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="sheet-url"
+                          placeholder="https://docs.google.com/spreadsheets/d/..."
+                          value={sheetUrl}
+                          onChange={(e) => setSheetUrl(e.target.value)}
+                          className="w-full"
+                          disabled={sheetNames.length > 0}
+                        />
+                        {sheetNames.length > 0 && (
+                          <Select
+                            value={selectedSheet}
+                            onValueChange={setSelectedSheet}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="Choose sheet" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sheetNames.map((name) => (
+                                <SelectItem key={name} value={name}>
+                                  {name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                      {sheetNames.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          The sheet should contain all the required fields listed above. Make sure the column headers match exactly.
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                      disabled={isLoading || !sheetUrl || (sheetNames.length > 0 && !selectedSheet)}
+                    >
+                      {isLoading ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          {sheetNames.length === 0 ? "Loading Sheets..." : "Fetching Events..."}
+                        </>
+                      ) : sheetNames.length === 0 ? (
+                        "Load Sheets"
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          {parsedData.length > 0 ? "Refresh Events" : "Upload Events"}
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                  {parsedData.length > 0 && (
+                    <div className="mt-6">
+                      <Tabs defaultValue="compact" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="compact">Compact View</TabsTrigger>
+                          <TabsTrigger value="table">Table View</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="compact" className="mt-4">
+                          <CompactEventList 
+                            events={parsedData} 
+                            members={members}
+                            committees={committees}
+                            onProjectHeadChange={handleProjectHeadChange}
+                            onCommitteeChange={handleCommitteeChange}
+                            onDateChange={handleDateChange}
+                            onDateRemove={handleDateRemove}
                                 existingArns={existingArns}
                                 validNatures={validNatures}
                                 onUpload={handleUpload}
-                              />
-                            </TabsContent>
-                            <TabsContent value="table" className="mt-4">
-                              <div className="overflow-auto">
-                                <table className="w-full divide-y divide-border whitespace-normal break-words">
-                                  <thead className="bg-muted/50">
-                                    <tr>
-                                      {columns.map((col) => (
-                                        <th
-                                          key={col}
-                                          className="px-2 py-1 text-left text-xs font-medium text-muted-foreground border-r border-border last:border-r-0"
-                                        >
-                                          {col}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border bg-background">
-                                    {parsedData.map((row, rowIndex) => (
-                                      <tr key={rowIndex} className="hover:bg-muted/50">
-                                        {columns.map((col) => (
-                                          <td
-                                            key={col}
-                                            className="px-2 py-1 text-xs text-foreground border-r border-border last:border-r-0"
-                                          >
-                                            {row[col] || '-'}
-                                          </td>
-                                        ))}
-                                      </tr>
+                          />
+                        </TabsContent>
+                        <TabsContent value="table" className="mt-4">
+                          <div className="overflow-auto">
+                            <table className="w-full divide-y divide-border whitespace-normal break-words">
+                              <thead className="bg-muted/50">
+                                <tr>
+                                  {columns.map((col) => (
+                                    <th
+                                      key={col}
+                                      className="px-2 py-1 text-left text-xs font-medium text-muted-foreground border-r border-border last:border-r-0"
+                                    >
+                                      {col}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border bg-background">
+                                {parsedData.map((row, rowIndex) => (
+                                  <tr key={rowIndex} className="hover:bg-muted/50">
+                                    {columns.map((col) => (
+                                      <td
+                                        key={col}
+                                        className="px-2 py-1 text-xs text-foreground border-r border-border last:border-r-0"
+                                      >
+                                        {row[col] || '-'}
+                                      </td>
                                     ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                         </div>
                       )}
                     </>

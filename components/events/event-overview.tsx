@@ -204,10 +204,10 @@ export function EventOverview({ event }: EventOverviewProps) {
           </div>
 
           {event.budget_allocation && event.budget_allocation > 0 && (
-            <div>
-              <h3 className="font-medium text-sm text-muted-foreground mb-1">
+          <div>
+            <h3 className="font-medium text-sm text-muted-foreground mb-1">
                 Budget Allocation
-              </h3>
+            </h3>
               <div className="flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-muted-foreground" />
                 <p>₱{event.budget_allocation.toLocaleString()}</p>

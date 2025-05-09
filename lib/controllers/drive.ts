@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { pool } from "@/lib/db";
 
 function extractFileId(url: string): string | null {
   const match = url.match(/\/d\/([^/]+)/);
@@ -15,7 +16,8 @@ export async function createActivityFolder(
   eventName: string, 
   preActsUrls: string[], 
   postActsUrls: string[], 
-  parentFolderId: string
+  parentFolderId: string,
+  eventId: number
 ) {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!);
   const auth = new google.auth.GoogleAuth({
@@ -118,6 +120,19 @@ export async function createActivityFolder(
   }
 
   console.log("Copy results:", copyResults);
+
+  // Update event_trackers with the new docu_drive_id
+  try {
+    await pool.query(
+      "UPDATE event_trackers SET preacts_status = 'AVP', docu_drive_id = ? WHERE event_id = ?",
+      [newFolderId, eventId]
+    );
+    console.log("Updated (", eventId, ") event_trackers with docu_drive_id:", newFolderId);
+  } catch (err) {
+    console.error("Error updating event_trackers:", err);
+    // Don't throw here - we still want to return the folder creation results
+  }
+
   return { folderId: newFolderId, results: copyResults };
 }
 

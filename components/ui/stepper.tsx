@@ -4,16 +4,16 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 interface Step {
-  title: string
-  description?: string
+    title: string
+    description?: string
   subtext?: string
-  status: "complete" | "current" | "upcoming"
-  date?: string
+    status: "complete" | "current" | "upcoming"
+    date?: string
   icon?: React.ReactNode
-  actionButton?: {
-    label: string
-    onClick: () => void
-  }
+    actionButton?: {
+      label: string
+      onClick: () => void
+    }
   className?: string
 }
 
@@ -40,7 +40,7 @@ export function Stepper({ steps }: StepperProps) {
               {step.icon || (
                 <span
                   className={cn(
-                    "text-sm font-medium",
+                  "text-sm font-medium",
                     step.status === "current"
                       ? "text-primary"
                       : "text-muted-foreground/25"
@@ -66,14 +66,14 @@ export function Stepper({ steps }: StepperProps) {
               <div className="space-y-1">
                 <h3
                   className={cn(
-                    "text-sm font-medium",
+                "text-sm font-medium",
                     step.status === "current"
                       ? "text-primary"
                       : step.className || "text-foreground"
                   )}
                 >
-                  {step.title}
-                </h3>
+                {step.title}
+              </h3>
                 {step.description && (
                   <div className="space-y-1">
                     <p className={cn("text-sm", step.className || "text-muted-foreground")}>

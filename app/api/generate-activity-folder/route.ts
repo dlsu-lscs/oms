@@ -27,7 +27,7 @@ function getRequiredEnvVar(name: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { eventName, committee, preActsUrls, postActsUrls } = await req.json();
+    const { eventName, committee, preActsUrls, postActsUrls, eventId } = await req.json();
     const steps = [];
     let currentStep = 0;
 
@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
         eventName,
         preActsUrls,
         postActsUrls,
-        termFolder.id
+        termFolder.id,
+        eventId
       );
 
       // Update steps with file creation results

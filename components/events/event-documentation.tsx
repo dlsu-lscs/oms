@@ -13,15 +13,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle, FileText, ExternalLink } from "lucide-react";
 import { Event } from "@/app/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MultiselectDropdown } from "@/components/ui/MultiselectDropdown";
 import { PreActsTemplatesSkeleton } from "@/components/events/PreActsTemplatesSkeleton";
 import { Badge } from "@/components/ui/badge";
+import React from "react";
+import { toast } from "sonner";
+import { FileStatusBadge } from "@/components/ui/file-status-badge";
+import { formatDistanceToNow } from 'date-fns';
 
 interface EventDocumentationProps {
   event: Event;
+}
+
+interface DriveFile {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  createdTime: string;
+  modifiedTime: string;
+  lastModifiedBy: string;
+  status?: string;
 }
 
 export function EventDocumentation({ event }: EventDocumentationProps) {
@@ -39,6 +60,18 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
   const [folderId, setFolderId] = useState<string | null>(null);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preactsStatus, setPreactsStatus] = useState<string>('INIT');
+  const [preactsFiles, setPreactsFiles] = useState<DriveFile[]>([]);
+  const [isLoadingPreactsFiles, setIsLoadingPreactsFiles] = useState(false);
+  const [preactsDeadline, setPreactsDeadline] = useState<string | null>(null);
+  const [defaultOpenFile, setDefaultOpenFile] = useState<string | null>(null);
+  const [fileStatuses, setFileStatuses] = useState<Record<string, string>>({});
+
+  // Helper for months
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
 
   useEffect(() => {
     async function fetchFiles() {
@@ -80,6 +113,73 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
     fetchFiles();
   }, []);
 
+  useEffect(() => {
+    async function fetchPreactsStatus() {
+      if (!event?.id) return;
+      
+      try {
+        const response = await fetch('/api/events/preacts-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: event.id }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch preacts status');
+        const data = await response.json();
+        setPreactsStatus(data.status);
+      } catch (error) {
+        console.error('Error fetching preacts status:', error);
+      }
+    }
+
+    fetchPreactsStatus();
+  }, [event?.id]);
+
+  useEffect(() => {
+    async function fetchPreactsFiles() {
+      if (!event?.id) return;
+      
+      console.log('Fetching preacts files with status:', preactsStatus);
+      setIsLoadingPreactsFiles(true);
+      try {
+        const response = await fetch('/api/events/preacts-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: event.id }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch Pre-Acts files');
+        const data = await response.json();
+        console.log('Received files:', data.files);
+        setPreactsFiles(data.files);
+        setPreactsDeadline(data.preactsDeadline);
+
+        // Fetch all file statuses in bulk
+        if (data.files.length > 0) {
+          const fileKeys = data.files.map((file: DriveFile) => file.id).join(',');
+          const statusResponse = await fetch(`/api/events/file-status?fileKeys=${fileKeys}`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            setFileStatuses(statusData.statuses);
+          }
+        }
+
+        // Treat null deadline as date zero (1970-01-01)
+        const deadline = data.preactsDeadline ? new Date(data.preactsDeadline) : new Date(0);
+        if (deadline > new Date() && data.files.length > 0) {
+          setDefaultOpenFile(data.files[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching Pre-Acts files:', error);
+        toast.error('Failed to load Pre-Acts files');
+      } finally {
+        setIsLoadingPreactsFiles(false);
+      }
+    }
+
+    fetchPreactsFiles();
+  }, [event?.id, preactsStatus]);
+
   const handleGenerateLinks = () => {
     if (!slug) return;
     const baseUrl = "lscs.info";
@@ -94,21 +194,33 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
   };
 
   const handleGenerateFolder = async () => {
-    const preActsUrls = preActsTemplates
-      .filter((t) => selectedPreActsTemplates.includes(t.value))
-      .map((t) => t.url);
+    setIsGenerating(true);
+    setError(null);
     
-    const postActsUrls = postActsTemplates
-      .filter((t) => selectedPostActsTemplates.includes(t.value))
-      .map((t) => t.url);
+    // Debug logging
+    console.log("Event data:", {
+      id: event.id,
+      name: event.event_name,
+      committee: event.committee
+    });
 
-    if (!event?.event_name || (preActsUrls.length === 0 && postActsUrls.length === 0)) {
-      setError("Please select at least one template.");
+    if (!event.id || !event.event_name || !event.committee) {
+      setError("Missing required event data");
+      toast.error("Missing required event data");
+      setIsGenerating(false);
       return;
     }
 
-    setIsGenerating(true);
-    setError(null);
+    // Get the full URLs for selected templates
+    const preActsUrls = preActsTemplates
+      .filter(t => selectedPreActsTemplates.includes(t.value))
+      .map(t => t.url);
+    
+    const postActsUrls = postActsTemplates
+      .filter(t => selectedPostActsTemplates.includes(t.value))
+      .map(t => t.url);
+
+    // Set initial stepper steps
     setStepperSteps([
       { label: "Finding committee folder", status: "pending", message: "" },
       { label: "Finding term folder", status: "pending", message: "" },
@@ -119,19 +231,28 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
     ]);
 
     try {
-      const res = await fetch("/api/generate-activity-folder", {
+      const response = await fetch("/api/generate-activity-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           eventName: event.event_name,
           committee: event.committee,
           preActsUrls,
-          postActsUrls
+          postActsUrls,
+          eventId: event.id
         }),
       });
-      const data = await res.json();
-      
-      if (res.ok && data.steps) {
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate folder");
+      }
+
+      const data = await response.json();
+      console.log("Folder generated:", data);
+
+      // Update stepper steps with the response data
+      if (data.steps) {
         setFolderId(data.folderId);
         let i = 0;
         const animateSteps = async () => {
@@ -147,16 +268,28 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
           }
         };
         animateSteps();
-      } else {
-        setError(data.error || "Failed to generate folder");
-        setStepperSteps(null);
       }
+
+      toast.success("Activity folder generated successfully!");
     } catch (err: any) {
-      setError("An unexpected error occurred.");
+      console.error("Error generating folder:", err);
+      setError(err.message || "Failed to generate folder");
+      toast.error(err.message || "Failed to generate folder");
       setStepperSteps(null);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const isPreActsSelected = selectedPreActsTemplates.length > 0;
+  const isPostActsSelected = selectedPostActsTemplates.length > 0;
+  const canGenerate = isPreActsSelected && isPostActsSelected;
+
+  const handleStatusChange = (fileKey: string, newStatus: string) => {
+    setFileStatuses(prev => ({
+      ...prev,
+      [fileKey]: newStatus
+    }));
   };
 
   return (
@@ -170,9 +303,9 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
 
       {isLoadingFiles ? (
         <PreActsTemplatesSkeleton />
-      ) : (
+      ) : preactsStatus === 'INIT' ? (
         <div className="rounded-lg border p-6">
-          <h3 className="text-lg font-semibold mb-4">Pre-Acts File Templates</h3>
+          <h3 className="text-lg font-semibold mb-4">Create Activity Folder</h3>
           {stepperSteps ? (
             <div className="space-y-6">
               {stepperSteps.map((step, idx) => {
@@ -238,175 +371,112 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
                   />
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="mt-6" onClick={handleGenerateFolder} disabled={isGenerating}>
-                {isGenerating ? "Generating..." : "Generate Activity Folder"}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-6"
+                onClick={handleGenerateFolder}
+                disabled={!canGenerate || isGenerating}
+              >
+                {isGenerating ? (
+                  "Generating..."
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M4.433 22l-1.98-9.708 6.565-6.565 1.98 9.708-6.565 6.565zm2.828-2.828l4.95-4.95-1.414-1.414-4.95 4.95 1.414 1.414zm9.9-9.9l4.95-4.95-1.414-1.414-4.95 4.95 1.414 1.414zm2.828-2.828l1.414-1.414-4.95-4.95-1.414 1.414 4.95 4.95z"/>
+                    </svg>
+                    Generate Activity Folder
+                  </>
+                )}
               </Button>
             </>
           )}
         </div>
+      ) : (
+        <>
+          <div className="rounded-lg border p-6">
+            <h3 className="text-lg font-semibold mb-4">Documentation Status</h3>
+            <Stepper
+              steps={[
+                {
+                  title: "Pre-Acts",
+                  description: "Initial project documentation and planning",
+                  status: "complete",
+                  date: "2024-03-15",
+                },
+                {
+                  title: "Event Day",
+                  description: "Event execution and documentation",
+                  status: "current",
+                  date: "2024-04-01"
+                },
+                {
+                  title: "Post-Acts",
+                  description: "Post-event documentation and reports",
+                  status: "upcoming",
+                  date: "2024-04-02"
+                },
+                {
+                  title: "CSO Evaluation",
+                  description: "Final evaluation and feedback",
+                  status: "upcoming",
+                  date: "2024-04-15"
+                }
+              ]}
+            />
+          </div>
+
+          <Accordion 
+            type="single" 
+            collapsible 
+            className="w-full"
+            defaultValue={defaultOpenFile || undefined}
+          >
+            <AccordionItem value="preacts-files">
+              <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                <h3 className="text-lg font-semibold">Pre-Acts</h3>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-4">
+                {isLoadingPreactsFiles ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : preactsFiles.length > 0 ? (
+                  <div className="space-y-4">
+                    {preactsFiles.map((file) => (
+                      <div key={file.id} className="py-3 border-b last:border-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium hover:text-muted-foreground transition-colors"
+                            >
+                              {file.name}
+                            </a>
+                          </div>
+                          <FileStatusBadge 
+                            fileKey={file.id} 
+                            initialStatus={fileStatuses[file.id] as any}
+                            onStatusChange={(status) => handleStatusChange(file.id, status)}
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground pl-6">
+                          Last modified by {file.lastModifiedBy} {file.modifiedTime ? formatDistanceToNow(new Date(file.modifiedTime), { addSuffix: true }) : 'recently'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">No files found in Pre-Acts folder</p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </>
       )}
-
-      <div className="rounded-lg border p-6">
-        <h3 className="text-lg font-semibold mb-4">Documentation Status</h3>
-        <Stepper
-          steps={[
-            {
-              title: "Pre-Acts",
-              description: "Initial project documentation and planning",
-              status: "complete",
-              date: "2024-03-15",
-              actionButton: {
-                label: "Open Pre-Acts Drive",
-                onClick: () => window.open("https://drive.google.com/drive/folders/pre-acts", "_blank")
-              }
-            },
-            {
-              title: "Event Day",
-              description: "Event execution and documentation",
-              status: "current",
-              date: "2024-04-01"
-            },
-            {
-              title: "Post-Acts",
-              description: "Post-event documentation and reports",
-              status: "upcoming",
-              date: "2024-04-02",
-              actionButton: {
-                label: "Open Post-Acts Drive",
-                onClick: () => window.open("https://drive.google.com/drive/folders/post-acts", "_blank")
-              }
-            },
-            {
-              title: "CSO Evaluation",
-              description: "Final evaluation and feedback",
-              status: "upcoming",
-              date: "2024-04-15"
-            }
-          ]}
-        />
-      </div>
-      
-      <div className="rounded-lg border p-6">
-        <h3 className="text-lg font-semibold mb-4">Required Documents</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">Project Proposal</h4>
-              <p className="text-sm text-muted-foreground">Initial project documentation</p>
-            </div>
-            <Button variant="outline" size="sm">
-              View Document
-            </Button>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">CSO Submission</h4>
-              <p className="text-sm text-muted-foreground">CSO review documentation</p>
-            </div>
-            <Button variant="outline" size="sm">
-              View Document
-            </Button>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">Event Report</h4>
-              <p className="text-sm text-muted-foreground">Post-event documentation</p>
-            </div>
-            <Button variant="outline" size="sm">
-              View Document
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border p-6">
-        <h3 className="text-lg font-semibold mb-4">Form Links</h3>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Generate Links
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Generate Form Links</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="slug">Enter Slug</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="slug"
-                    placeholder="Enter slug (e.g., event-name)"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                  />
-                  <Button onClick={handleGenerateLinks}>Generate</Button>
-                </div>
-              </div>
-
-              {/* Live Preview Section */}
-              <div className="space-y-4 rounded-lg border p-4 bg-muted/50">
-                <h4 className="text-sm font-medium">Preview</h4>
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">GALS Link</Label>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">lscs.info/<span className="font-medium text-foreground">{slug || "your-slug"}</span>GALS</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Preregistration Link</Label>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">lscs.info/</span>
-                      <span className="font-medium">{slug || "your-slug"}PreReg</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {generatedLinks && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>GALS Link</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={generatedLinks.gals}
-                        readOnly
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => copyToClipboard(generatedLinks.gals)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Preregistration Link</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={generatedLinks.prereg}
-                        readOnly
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => copyToClipboard(generatedLinks.prereg)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
     </div>
   );
 } 

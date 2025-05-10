@@ -5,14 +5,18 @@ import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import EventList from "@/components/dashboard-events";
+import DocuLogiEvents from "@/components/doculogi-events";
 import { Event } from "@/app/types";
 import { useEffect, useState } from "react";
 import EventCardSkeleton from "@/components/event-card-skeleton";
 import { cn } from "@/lib/utils";
+import { useSession } from "next-auth/react";
 
 export default function Dashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDocuLogi, setIsDocuLogi] = useState(false);
+  const { data: session } = useSession();
 
   useEffect(() => {
     async function fetchEvents() {
@@ -30,8 +34,21 @@ export default function Dashboard() {
       }
     }
 
+    async function checkCommittee() {
+      if (session?.user?.memberId) {
+        try {
+          const response = await fetch('/api/events/doculogi');
+          setIsDocuLogi(response.ok);
+        } catch (error) {
+          console.error('Error checking committee:', error);
+          setIsDocuLogi(false);
+        }
+      }
+    }
+
     fetchEvents();
-  }, []);
+    checkCommittee();
+  }, [session?.user?.memberId]);
 
   return (
     <SidebarProvider
@@ -49,6 +66,12 @@ export default function Dashboard() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 px-4 md:gap-6 md:py-6 md:px-6">
               <SectionCards />
+              {isDocuLogi && (
+                <>
+                  <div className="text-3xl font-bold">DocuLogi Events</div>
+                  <DocuLogiEvents />
+                </>
+              )}
               <div className="text-3xl font-bold">Your events</div>
               <div className="relative">
                 <div

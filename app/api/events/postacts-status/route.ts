@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 interface EventTrackerRow extends RowDataPacket {
-  preacts_status: string;
+  postacts_status: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     }
 
     const [rows] = await pool.query<EventTrackerRow[]>(
-      'SELECT preacts_status FROM event_trackers WHERE event_id = ?',
+      'SELECT postacts_status FROM event_trackers WHERE event_id = ?',
       [eventId]
     );
 
@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event tracker not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ status: rows[0].preacts_status });
+    return NextResponse.json({ status: rows[0].postacts_status });
   } catch (error) {
-    console.error('Error fetching Pre-Acts status:', error);
+    console.error('Error fetching Post-Acts status:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -52,18 +52,18 @@ export async function POST(req: Request) {
 
     // Check if user is DOCULOGI
     if (status !== 'SENT' && session.user.committeeId?.toString() !== 'DOCULOGI') {
-      return NextResponse.json({ error: 'Only DOCULOGI members can update Pre-Acts status' }, { status: 403 });
+      return NextResponse.json({ error: 'Only DOCULOGI members can update Post-Acts status' }, { status: 403 });
     }
 
     // Update the status in the database
     await pool.query(
-      'UPDATE event_trackers SET preacts_status = ? WHERE event_id = ?',
+      'UPDATE event_trackers SET postacts_status = ? WHERE event_id = ?',
       [status, eventId]
     );
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating Pre-Acts status:', error);
+    console.error('Error updating Post-Acts status:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

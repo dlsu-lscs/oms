@@ -2,14 +2,14 @@ export interface Event {
   id: number;
   arn: string;
   event_name: string;
-  start: Date;
-  end: Date;
+  committee: string;
   duration: string;
+  dates?: Date[];
   type: string;
-  committee?: string;
-  committeeId?: number;
-  nature?: string;
-  eventVisual?: string | null;
+  nature: string;
+  eventVisual?: string;
+  event_post_caption?: string;
+  project_heads?: string;
   venue?: string;
   budget_allocation?: number;
   brief_description?: string;
@@ -17,7 +17,6 @@ export interface Event {
   objectives?: string;
   strategies?: string;
   measures?: string;
-  event_post_caption?: string;
 }
 
 export interface Participant {
@@ -30,3 +29,13 @@ export interface Participant {
   attended: boolean;
   notes: string;
 }
+
+
+// Define the status values
+const statusValues = ['INIT', 'SENT', 'DONE', 'REVISE', 'APPROVED', null] as const;
+
+// Export the type
+export type FileStatus = typeof statusValues[number];
+
+// Export the values as a readonly array
+export const fileStatuses: readonly FileStatus[] = statusValues; 

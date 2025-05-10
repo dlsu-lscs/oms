@@ -9,19 +9,18 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-
-type FileStatus = 'NOT_STARTED' | 'DRAFTING' | 'DONE' | 'REVISE' | 'APPROVED';
+import { FileStatus } from "@/app/types";
 
 const statusConfig = {
-  NOT_STARTED: { 
-    label: 'Not Started', 
-    variant: 'secondary' as const,
-    className: 'bg-secondary text-secondary-foreground'
-  },
-  DRAFTING: { 
-    label: 'Drafting', 
+  INIT: { 
+    label: 'Initialize', 
     variant: 'secondary' as const,
     className: 'bg-gray-500 text-white'
+  },
+  SENT: { 
+    label: 'Sent for Review', 
+    variant: 'secondary' as const,
+    className: 'bg-yellow-500 text-white'
   },
   DONE: { 
     label: 'Done', 
@@ -44,15 +43,18 @@ interface FileStatusBadgeProps {
   fileKey: string;
   initialStatus?: FileStatus;
   onStatusChange?: (newStatus: FileStatus) => void;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
-export function FileStatusBadge({ fileKey, initialStatus, onStatusChange }: FileStatusBadgeProps) {
-  const [status, setStatus] = useState<FileStatus>(initialStatus || 'NOT_STARTED');
+export function FileStatusBadge({ fileKey, initialStatus, onStatusChange, isLoading, error }: FileStatusBadgeProps) {
+  const [status, setStatus] = useState<FileStatus>(initialStatus ?? 'INIT');
   const { data: session } = useSession();
   const isDoculogi = session?.user?.committeeId?.toString() === 'DOCULOGI';
+  const isApproved = status === 'APPROVED';
 
   useEffect(() => {
-    if (initialStatus) {
+    if (initialStatus !== undefined) {
       setStatus(initialStatus);
     }
   }, [initialStatus]);
@@ -63,43 +65,34 @@ export function FileStatusBadge({ fileKey, initialStatus, onStatusChange }: File
       return;
     }
 
-    if (['REVISE', 'APPROVED'].includes(newStatus) && !isDoculogi) {
-      toast.error('Only DOCULOGI members can set this status');
-      return;
-    }
-
     try {
-      const response = await fetch('/api/events/file-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileKey, status: newStatus }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update status');
-      }
-      
-      setStatus(newStatus);
       onStatusChange?.(newStatus);
-      toast.success('Status updated successfully');
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update status');
     }
   };
 
-  const config = statusConfig[status];
+  const config = status ? statusConfig[status] : statusConfig.INIT;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Badge 
           variant={config.variant} 
-          className={`cursor-pointer flex items-center gap-1 ${config.className}`}
+          className={`${config.className} ${isApproved && !isDoculogi ? 'cursor-default pointer-events-none' : 'cursor-pointer'} flex items-center gap-1`}
+          onClick={(e) => isApproved && !isDoculogi && e.preventDefault()}
         >
-          {config.label}
-          <ChevronDown className="h-3 w-3" />
+          {isLoading ? (
+            <span className="animate-pulse">Updating...</span>
+          ) : error ? (
+            <span className="text-red-500">{error}</span>
+          ) : (
+            <>
+              {config.label}
+              {(!isApproved || isDoculogi) && <ChevronDown className="h-3 w-3" />}
+            </>
+          )}
         </Badge>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">

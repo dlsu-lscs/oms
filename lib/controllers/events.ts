@@ -94,6 +94,66 @@ interface EventDatesQueryResult extends RowDataPacket {
   end_time: Date;
 }
 
+export interface DocuLogiEvent {
+  id: number;
+  arn: string;
+  title: string;
+  event_name: string;
+  committee: string;
+  duration: string;
+  type: string;
+  nature: string;
+  eventVisual?: string;
+  event_post_caption?: string;
+  project_heads?: string;
+  venue?: string;
+  budget_allocation?: number;
+  brief_description?: string;
+  goals?: string;
+  objectives?: string;
+  strategies?: string;
+  measures?: string;
+  preacts_deadline: Date | null;
+  preacts_status: string;
+  postacts_deadline: Date | null;
+  postacts_status: string;
+  docu_head_id: number;
+  docu_head_fullname: string;
+  docu_head_nickname: string;
+  docu_head_email: string;
+  docu_head_telegram: string;
+}
+
+interface DocuLogiEventQueryResult extends RowDataPacket {
+  id: number;
+  arn: string;
+  title: string;
+  event_name: string;
+  committee: string;
+  duration: string;
+  type: string;
+  nature: string;
+  eventVisual?: string;
+  event_post_caption?: string;
+  project_heads?: string;
+  venue?: string;
+  budget_allocation?: number;
+  brief_description?: string;
+  goals?: string;
+  objectives?: string;
+  strategies?: string;
+  measures?: string;
+  preacts_deadline: string | null;
+  preacts_status: string;
+  postacts_deadline: string | null;
+  postacts_status: string;
+  docu_head_id: number;
+  docu_head_fullname: string;
+  docu_head_nickname: string;
+  docu_head_email: string;
+  docu_head_telegram: string;
+}
+
 export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
   try {
     const [rows] = await pool.execute(
@@ -222,16 +282,33 @@ export async function getEvents(): Promise<Event[]> {
   }
 }
 
-export async function getEventDates(arn: string): Promise<EventDates | null> {
+export async function getEventDates(eventId: number) {
   try {
-    const [rows] = await pool.execute(
-      `SELECT ed.start_time, ed.end_time 
-       FROM event_dates ed
-       JOIN events e ON ed.event_id = e.id
-       WHERE e.arn = ?`,
-      [arn]
-    ) as [EventDatesQueryResult[], FieldPacket[]];
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT start_time, end_time 
+       FROM event_dates 
+       WHERE event_id = ? 
+       ORDER BY start_time ASC`,
+      [eventId]
+    );
+    return rows;
+  } catch (error) {
+    console.error('Error getting event dates:', error);
+    throw error;
+  }
+}
 
+export async function getEventDateRange(eventId: number) {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 
+        MIN(start_time) as start_time,
+        MAX(end_time) as end_time
+       FROM event_dates 
+       WHERE event_id = ?`,
+      [eventId]
+    );
+    
     if (rows.length === 0) {
       return null;
     }
@@ -241,7 +318,54 @@ export async function getEventDates(arn: string): Promise<EventDates | null> {
       end_time: new Date(rows[0].end_time)
     };
   } catch (error) {
-    console.error("Error fetching event dates:", error);
-    return null;
+    console.error('Error getting event date range:', error);
+    throw error;
+  }
+}
+
+export async function getDocuLogiEvents(): Promise<DocuLogiEvent[]> {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT 
+        e.id AS id,
+        e.arn AS arn,
+        e.name AS title,
+        e.name AS event_name,
+        c.committee_name AS committee,
+        ed.name AS duration,
+        e.type AS type,
+        en.name AS nature,
+        e.venue AS venue,
+        e.budget_allocation AS budget_allocation,
+        e.brief_description AS brief_description,
+        e.goals AS goals,
+        e.objectives AS objectives,
+        e.strategies AS strategies,
+        e.measures AS measures,
+        t.preacts_deadline AS preacts_deadline,
+        t.preacts_status AS preacts_status,
+        t.postacts_deadline AS postacts_deadline,
+        t.postacts_status AS postacts_status,
+        m.id AS docu_head_id,
+        m.full_name AS docu_head_fullname,
+        m.nickname AS docu_head_nickname,
+        m.email AS docu_head_email,
+        m.telegram AS docu_head_telegram
+      FROM events e
+      JOIN event_trackers t ON t.event_id = e.id
+      LEFT JOIN members m ON e.docu_head = m.id
+      JOIN committees c ON e.committee_id = c.committee_id
+      JOIN event_durations ed ON e.duration_id = ed.id
+      JOIN event_natures en ON e.nature_id = en.id`
+    ) as [DocuLogiEventQueryResult[], FieldPacket[]];
+
+    return rows.map(row => ({
+      ...row,
+      preacts_deadline: row.preacts_deadline ? new Date(row.preacts_deadline) : null,
+      postacts_deadline: row.postacts_deadline ? new Date(row.postacts_deadline) : null
+    }));
+  } catch (error) {
+    console.error("Error fetching DocuLogi events:", error);
+    return [];
   }
 } 

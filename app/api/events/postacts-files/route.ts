@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { google } from "googleapis";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { RowDataPacket } from "mysql2";
 
 interface EventTrackerRow extends RowDataPacket {
   docu_drive_id: string;
-  preacts_deadline: Date;
-  preacts_status: string;
+  postacts_deadline: Date;
+  postacts_status: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
     }
 
-    // Get the Pre-Acts status and deadline
+    // Get the Post-Acts status and deadline
     const [trackerRows] = await pool.query<EventTrackerRow[]>(
-      'SELECT preacts_status, preacts_deadline FROM event_trackers WHERE event_id = ?',
+      'SELECT postacts_status, postacts_deadline FROM event_trackers WHERE event_id = ?',
       [eventId]
     );
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event tracker not found' }, { status: 404 });
     }
 
-    const { preacts_status, preacts_deadline } = trackerRows[0];
+    const { postacts_status, postacts_deadline } = trackerRows[0];
 
     // Get the docu_drive_id from event_trackers
     const [rows] = await pool.query<EventTrackerRow[]>(
@@ -52,21 +52,21 @@ export async function POST(req: NextRequest) {
     });
     const drive = google.drive({ version: "v3", auth });
 
-    // List files in the Pre-Acts folder
-    const preactsFolder = await drive.files.list({
-      q: `'${docuDriveId}' in parents and name = '[1] Pre-Acts' and mimeType = 'application/vnd.google-apps.folder'`,
+    // List files in the Post-Acts folder
+    const postactsFolder = await drive.files.list({
+      q: `'${docuDriveId}' in parents and name = '[2] Post-Acts' and mimeType = 'application/vnd.google-apps.folder'`,
       fields: "files(id)",
     });
 
-    if (!preactsFolder.data.files?.length) {
-      return NextResponse.json({ error: "Pre-Acts folder not found" }, { status: 404 });
+    if (!postactsFolder.data.files?.length) {
+      return NextResponse.json({ error: "Post-Acts folder not found" }, { status: 404 });
     }
 
-    const preactsFolderId = preactsFolder.data.files[0].id;
+    const postactsFolderId = postactsFolder.data.files[0].id;
 
-    // List all files in the Pre-Acts folder
+    // List all files in the Post-Acts folder
     const files = await drive.files.list({
-      q: `'${preactsFolderId}' in parents and trashed = false`,
+      q: `'${postactsFolderId}' in parents and trashed = false`,
       fields: "files(id, name, webViewLink, createdTime, modifiedTime, lastModifyingUser)",
       orderBy: "name",
     });
@@ -81,13 +81,13 @@ export async function POST(req: NextRequest) {
         modifiedTime: file.modifiedTime,
         lastModifiedBy: file.lastModifyingUser?.emailAddress || 'Unknown'
       })) || [],
-      preactsDeadline: preacts_deadline,
-      preactsStatus: preacts_status
+      postactsDeadline: postacts_deadline,
+      postactsStatus: postacts_status
     });
   } catch (error: any) {
-    console.error("Error fetching Pre-Acts files:", error);
+    console.error("Error fetching Post-Acts files:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch Pre-Acts files" },
+      { error: error.message || "Failed to fetch Post-Acts files" },
       { status: 500 }
     );
   }

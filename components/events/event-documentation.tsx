@@ -19,8 +19,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle, FileText, ExternalLink } from "lucide-react";
-import { Event } from "@/app/types";
+import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle, FileText, ExternalLink, Calendar } from "lucide-react";
+import { Event, FileStatus, fileStatuses } from "@/app/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MultiselectDropdown } from "@/components/ui/MultiselectDropdown";
 import { PreActsTemplatesSkeleton } from "@/components/events/PreActsTemplatesSkeleton";
@@ -28,7 +28,15 @@ import { Badge } from "@/components/ui/badge";
 import React from "react";
 import { toast } from "sonner";
 import { FileStatusBadge } from "@/components/ui/file-status-badge";
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
+import { useSession } from "next-auth/react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
 interface EventDocumentationProps {
   event: Event;
@@ -43,6 +51,118 @@ interface DriveFile {
   modifiedTime: string;
   lastModifiedBy: string;
   status?: string;
+}
+
+const statusColorMap = {
+  // Green statuses
+  FULLINCENTIVE: 'bg-green-500 text-white',
+  EARLYAPPROVAL: 'bg-green-500 text-white',
+  EARLYCOMP: 'bg-green-500 text-white',
+  HALFINCENTIVE: 'bg-green-500 text-white',
+  LATEINC: 'bg-green-500 text-white',
+  
+  // Orange statuses
+  REVISE: 'bg-orange-500 text-white',
+  
+  // Yellow statuses
+  AVP: 'bg-yellow-500 text-white',
+  SENT: 'bg-yellow-500 text-white',
+  DOCU: 'bg-yellow-500 text-white',
+  SIGNATURES: 'bg-yellow-500 text-white',
+  
+  // Red statuses
+  DENIED: 'bg-red-500 text-white',
+  CANCELLED: 'bg-red-500 text-white',
+  
+  // Grey statuses (default)
+  INIT: 'bg-gray-500 text-white',
+  PENDED: 'bg-gray-500 text-white',
+  HOLD: 'bg-gray-500 text-white',
+  UNCPEND: 'bg-gray-500 text-white',
+  SPECIAL: 'bg-gray-500 text-white',
+  DEFAULT: 'bg-gray-500 text-white',
+  SUBMITTED: 'bg-gray-500 text-white',
+  LATEAPPROVAL: 'bg-gray-500 text-white',
+  LATECOMP: 'bg-gray-500 text-white',
+  EARLYINC: 'bg-gray-500 text-white',
+};
+
+const statusLabels = {
+  INIT: 'Initialize',
+  AVP: 'Drafting',
+  SENT: 'Sent for Review',
+  DOCU: 'In Review',
+  REVISE: 'For Revision',
+  SIGNATURES: 'Collecting Signatures',
+  SUBMITTED: 'Submitted to CSO/SLIFE',
+  FULLINCENTIVE: 'Full Incentive',
+  HALFINCENTIVE: 'Half Incentive',
+  EARLYAPPROVAL: 'Early Approved',
+  LATEAPPROVAL: 'Late Approved',
+  EARLYCOMP: 'Early Complete',
+  EARLYINC: 'Early Incomplete',
+  LATECOMP: 'Late Complete',
+  LATEINC: 'Late Incomplete',
+  SPECIAL: 'Special',
+  DEFAULT: 'Default',
+  PENDED: 'Pending',
+  UNCPEND: 'Uncounted Pend',
+  DENIED: 'Denied',
+  HOLD: 'On Hold',
+  CANCELLED: 'Cancelled',
+};
+
+const validateStatus = (status: string | null): FileStatus => {
+  if (fileStatuses.includes(status as FileStatus)) {
+    return status as FileStatus;
+  }
+  throw new Error(`Invalid status: ${status}`);
+};
+
+const fetchWithRetry = async (url: string, options: any, retries = 3): Promise<Response> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+    }
+  }
+  throw new Error('Failed to fetch after retries');
+};
+
+async function getPostactsFiles(eventId: number) {
+  const response = await fetch('/api/events/postacts-files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId }),
+  });
+  
+  if (!response.ok) throw new Error('Failed to fetch Post-Acts files');
+  const data = await response.json();
+
+  // Fetch all file statuses in bulk
+  let fileStatuses = {};
+  if (data.files.length > 0) {
+    const fileKeys = data.files.map((file: DriveFile) => file.id).join(',');
+    const statusResponse = await fetch(`/api/events/file-status?fileKeys=${fileKeys}`);
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      console.log('File statuses response:', statusData); // Debug log
+      fileStatuses = statusData.statuses;
+    }
+  }
+
+  return {
+    files: data.files,
+    fileStatuses,
+    postactsDeadline: data.postactsDeadline,
+    postactsStatus: data.postactsStatus || 'INIT'
+  };
 }
 
 export function EventDocumentation({ event }: EventDocumentationProps) {
@@ -61,11 +181,56 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preactsStatus, setPreactsStatus] = useState<string>('INIT');
+  const [postactsStatus, setPostactsStatus] = useState<string>('INIT');
   const [preactsFiles, setPreactsFiles] = useState<DriveFile[]>([]);
+  const [postactsFiles, setPostactsFiles] = useState<DriveFile[]>([]);
   const [isLoadingPreactsFiles, setIsLoadingPreactsFiles] = useState(false);
+  const [isLoadingPostactsFiles, setIsLoadingPostactsFiles] = useState(false);
   const [preactsDeadline, setPreactsDeadline] = useState<string | null>(null);
+  const [postactsDeadline, setPostactsDeadline] = useState<string | null>(null);
   const [defaultOpenFile, setDefaultOpenFile] = useState<string | null>(null);
-  const [fileStatuses, setFileStatuses] = useState<Record<string, string>>({});
+  const [fileStatuses, setFileStatuses] = useState<Record<string, FileStatus>>({});
+  const [dateRange, setDateRange] = useState<{ start_time: Date; end_time: Date } | null>(null);
+  const { data: session } = useSession();
+  const isDoculogi = session?.user?.committeeId?.toString() === 'DOCULOGI';
+
+  // Add loading states
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const [errorStates, setErrorStates] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    async function fetchDateRange() {
+      if (!event?.id) return;
+
+      try {
+        const response = await fetch('/api/events/date-range', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ eventId: event.id }),
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch event date range');
+        const data = await response.json();
+        setDateRange(data);
+      } catch (error) {
+        console.error('Error fetching event date range:', error);
+      }
+    }
+
+    fetchDateRange();
+  }, [event?.id]);
+
+  // Add debug logging
+  useEffect(() => {
+    console.log('EventDocumentation - Event Data:', {
+      event,
+      preactsStatus,
+      postactsStatus,
+      isDoculogi
+    });
+  }, [event, preactsStatus, postactsStatus, isDoculogi]);
 
   // Helper for months
   const months = [
@@ -118,17 +283,17 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
       if (!event?.id) return;
       
       try {
-        const response = await fetch('/api/events/preacts-status', {
-          method: 'POST',
+        const response = await fetch(`/api/events/preacts-status?eventId=${event.id}`, {
+          method: 'GET',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ eventId: event.id }),
         });
         
         if (!response.ok) throw new Error('Failed to fetch preacts status');
         const data = await response.json();
-        setPreactsStatus(data.status);
+        setPreactsStatus(data.status || 'INIT');
       } catch (error) {
         console.error('Error fetching preacts status:', error);
+        setPreactsStatus('INIT');
       }
     }
 
@@ -153,6 +318,7 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
         console.log('Received files:', data.files);
         setPreactsFiles(data.files);
         setPreactsDeadline(data.preactsDeadline);
+        setPreactsStatus(data.preactsStatus || 'INIT');
 
         // Fetch all file statuses in bulk
         if (data.files.length > 0) {
@@ -179,6 +345,54 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
 
     fetchPreactsFiles();
   }, [event?.id, preactsStatus]);
+
+  useEffect(() => {
+    async function fetchPostactsFiles() {
+      if (!event?.id) return;
+      
+      setIsLoadingPostactsFiles(true);
+      try {
+        const data = await getPostactsFiles(event.id);
+        console.log('Postacts files data:', data); // Debug log
+        setPostactsFiles(data.files);
+        
+        // Map file statuses using file_key
+        const newStatuses: Record<string, FileStatus> = {};
+        if (data.files.length > 0) {
+          const fileKeys = data.files.map((file: DriveFile) => file.id).join(',');
+          const statusResponse = await fetch(`/api/events/file-status?fileKeys=${fileKeys}`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            console.log('File statuses response:', statusData); // Debug log
+            Object.entries(statusData.statuses).forEach(([key, value]) => {
+              newStatuses[key] = value as FileStatus;
+            });
+          }
+        }
+        
+        setFileStatuses(prev => ({
+          ...prev,
+          ...newStatuses
+        }));
+        setPostactsDeadline(data.postactsDeadline);
+        setPostactsStatus(data.postactsStatus);
+
+        if (dateRange?.end_time) {
+          const eventEndDate = new Date(dateRange.end_time);
+          if (eventEndDate < new Date() && data.files.length > 0) {
+            setDefaultOpenFile(data.files[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Post-Acts files:', error);
+        toast.error('Failed to load Post-Acts files');
+      } finally {
+        setIsLoadingPostactsFiles(false);
+      }
+    }
+
+    fetchPostactsFiles();
+  }, [event?.id, dateRange?.end_time]);
 
   const handleGenerateLinks = () => {
     if (!slug) return;
@@ -285,12 +499,303 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
   const isPostActsSelected = selectedPostActsTemplates.length > 0;
   const canGenerate = isPreActsSelected && isPostActsSelected;
 
-  const handleStatusChange = (fileKey: string, newStatus: string) => {
-    setFileStatuses(prev => ({
-      ...prev,
-      [fileKey]: newStatus
-    }));
+  const handlePreactsStatusChange = async (newStatus: string) => {
+    if (!event?.id) return;
+
+    try {
+      const response = await fetch('/api/events/preacts-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: event.id, status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update status');
+      }
+
+      setPreactsStatus(newStatus);
+      toast.success('Pre-Acts status updated successfully');
+    } catch (error) {
+      console.error('Error updating Pre-Acts status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update status');
+    }
   };
+
+  const handlePostactsStatusChange = async (newStatus: string) => {
+    if (!event?.id) return;
+
+    try {
+      const response = await fetch('/api/events/postacts-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: event.id, status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update status');
+      }
+
+      setPostactsStatus(newStatus);
+      toast.success('Post-Acts status updated successfully');
+    } catch (error) {
+      console.error('Error updating Post-Acts status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update status');
+    }
+  };
+
+  const handleStatusChange = async (fileKey: string, newStatus: string | null) => {
+    try {
+      // Validate status
+      const validatedStatus = validateStatus(newStatus);
+      
+      // Optimistic update
+      setFileStatuses(prev => ({ ...prev, [fileKey]: validatedStatus }));
+      setLoadingStates(prev => ({ ...prev, [fileKey]: true }));
+      setErrorStates(prev => ({ ...prev, [fileKey]: null }));
+
+      // Update on server with retry
+      const response = await fetchWithRetry('/api/events/file-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileKey, status: validatedStatus }),
+      });
+
+      if (!response?.ok) {
+        throw new Error('Failed to update file status');
+      }
+
+      // Check if all files are done
+      const updatedStatuses = { ...fileStatuses, [fileKey]: validatedStatus };
+      const allPreActsFilesDone = preactsFiles.every(file => updatedStatuses[file.id] === 'DONE');
+      const allPostActsFilesDone = postactsFiles.every(file => updatedStatuses[file.id] === 'DONE');
+
+      if (allPreActsFilesDone && preactsStatus !== 'SENT') {
+        await handlePreactsStatusChange('SENT');
+      }
+
+      if (allPostActsFilesDone && postactsStatus !== 'SENT') {
+        await handlePostactsStatusChange('SENT');
+      }
+
+      toast.success('File status updated successfully');
+    } catch (error) {
+      // Revert on failure
+      setFileStatuses(prev => ({ ...prev, [fileKey]: prev[fileKey] }));
+      setErrorStates(prev => ({ 
+        ...prev, 
+        [fileKey]: error instanceof Error ? error.message : 'Failed to update status' 
+      }));
+      toast.error(error instanceof Error ? error.message : 'Failed to update status');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [fileKey]: false }));
+    }
+  };
+
+  const preactsAccordion = (
+    <AccordionItem value="preacts" className="border-none">
+      <AccordionTrigger className="hover:no-underline">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          <span className="text-lg font-semibold">Pre-Acts</span>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent>
+        <div className="space-y-4">
+          <div className="flex justify-start mb-2">
+            {isDoculogi ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="secondary"
+                    className={`${statusColorMap[preactsStatus as keyof typeof statusColorMap] || 'bg-gray-500 text-white'} hover:opacity-90`}
+                  >
+                    {statusLabels[preactsStatus as keyof typeof statusLabels] || preactsStatus}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {Object.entries(statusLabels).map(([key, label]) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => handlePreactsStatusChange(key)}
+                      className="flex items-center justify-between"
+                    >
+                      <Badge 
+                        variant="secondary" 
+                        className={`ml-2 ${statusColorMap[key as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
+                      >
+                        {label}
+                      </Badge>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                variant="secondary"
+                className={`${statusColorMap[preactsStatus as keyof typeof statusColorMap] || 'bg-gray-500 text-white'} cursor-default pointer-events-none`}
+                onClick={(e) => e.preventDefault()}
+              >
+                {statusLabels[preactsStatus as keyof typeof statusLabels] || preactsStatus}
+              </Button>
+            )}
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            Track your Pre-Acts progress here. Upload and manage your Pre-Acts documents, and monitor their status.
+            {preactsDeadline && (
+              <span className="flex items-center gap-1 mt-1">
+                <Calendar className="h-4 w-4" />
+                <span className="font-medium">Deadline: {format(new Date(preactsDeadline), 'MMMM d, yyyy')}</span>
+              </span>
+            )}
+          </p>
+
+          {isLoadingPreactsFiles ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : preactsFiles.length > 0 ? (
+            <div className="space-y-4">
+              {preactsFiles.map((file) => (
+                <div key={file.id} className="py-3 border-b last:border-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium hover:text-muted-foreground transition-colors"
+                      >
+                        {file.name}
+                      </a>
+                    </div>
+                    <FileStatusBadge 
+                      fileKey={file.id} 
+                      initialStatus={fileStatuses[file.id] || undefined}
+                      onStatusChange={(status) => handleStatusChange(file.id, status)}
+                      isLoading={loadingStates[file.id]}
+                      error={errorStates[file.id]}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-6">
+                    Last modified by {file.lastModifiedBy} {file.modifiedTime ? formatDistanceToNow(new Date(file.modifiedTime), { addSuffix: true }) : 'recently'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No files found in Pre-Acts folder</p>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  );
+
+  const postactsAccordion = (
+    <AccordionItem value="postacts" className="border-none">
+      <AccordionTrigger className="hover:no-underline">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          <span className="text-lg font-semibold">Post-Acts</span>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent>
+        <div className="space-y-4">
+          <div className="flex justify-start mb-2">
+            {isDoculogi ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="secondary"
+                    className={`${statusColorMap[postactsStatus as keyof typeof statusColorMap] || 'bg-gray-500 text-white'} hover:opacity-90`}
+                  >
+                    {statusLabels[postactsStatus as keyof typeof statusLabels] || postactsStatus}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {Object.entries(statusLabels).map(([key, label]) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => handlePostactsStatusChange(key)}
+                      className="flex items-center justify-between"
+                    >
+                      <Badge 
+                        variant="secondary" 
+                        className={`ml-2 ${statusColorMap[key as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
+                      >
+                        {label}
+                      </Badge>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                variant="secondary"
+                className={`${statusColorMap[postactsStatus as keyof typeof statusColorMap] || 'bg-gray-500 text-white'} cursor-default pointer-events-none`}
+                onClick={(e) => e.preventDefault()}
+              >
+                {statusLabels[postactsStatus as keyof typeof statusLabels] || postactsStatus}
+              </Button>
+            )}
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            Track your Post-Acts progress here. Upload and manage your Post-Acts documents, and monitor their status.
+            {postactsDeadline && (
+              <span className="flex items-center gap-1 mt-1">
+                <Calendar className="h-4 w-4" />
+                <span className="font-medium">Deadline: {format(new Date(postactsDeadline), 'MMMM d, yyyy')}</span>
+              </span>
+            )}
+          </p>
+
+          {isLoadingPostactsFiles ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : postactsFiles.length > 0 ? (
+            <div className="space-y-4">
+              {postactsFiles.map((file) => (
+                <div key={file.id} className="py-3 border-b last:border-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium hover:text-muted-foreground transition-colors"
+                      >
+                        {file.name}
+                      </a>
+                    </div>
+                    <FileStatusBadge 
+                      fileKey={file.id} 
+                      initialStatus={fileStatuses[file.id] || undefined}
+                      onStatusChange={(status) => handleStatusChange(file.id, status)}
+                      isLoading={loadingStates[file.id]}
+                      error={errorStates[file.id]}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-6">
+                    Last modified by {file.lastModifiedBy} {file.modifiedTime ? formatDistanceToNow(new Date(file.modifiedTime), { addSuffix: true }) : 'recently'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No files found in Post-Acts folder</p>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  );
 
   return (
     <div className="space-y-6">
@@ -432,48 +937,16 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
             className="w-full"
             defaultValue={defaultOpenFile || undefined}
           >
-            <AccordionItem value="preacts-files">
-              <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                <h3 className="text-lg font-semibold">Pre-Acts</h3>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-4">
-                {isLoadingPreactsFiles ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : preactsFiles.length > 0 ? (
-                  <div className="space-y-4">
-                    {preactsFiles.map((file) => (
-                      <div key={file.id} className="py-3 border-b last:border-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-primary" />
-                            <a
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium hover:text-muted-foreground transition-colors"
-                            >
-                              {file.name}
-                            </a>
-                          </div>
-                          <FileStatusBadge 
-                            fileKey={file.id} 
-                            initialStatus={fileStatuses[file.id] as any}
-                            onStatusChange={(status) => handleStatusChange(file.id, status)}
-                          />
-                        </div>
-                        <div className="text-xs text-muted-foreground pl-6">
-                          Last modified by {file.lastModifiedBy} {file.modifiedTime ? formatDistanceToNow(new Date(file.modifiedTime), { addSuffix: true }) : 'recently'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">No files found in Pre-Acts folder</p>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+            {preactsAccordion}
+          </Accordion>
+
+          <Accordion 
+            type="single" 
+            collapsible 
+            className="w-full"
+            defaultValue={defaultOpenFile || undefined}
+          >
+            {postactsAccordion}
           </Accordion>
         </>
       )}

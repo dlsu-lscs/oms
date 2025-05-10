@@ -85,7 +85,8 @@ function EventOverviewSkeleton() {
 export function EventOverview({ event }: EventOverviewProps) {
   const [projectHeads, setProjectHeads] = useState<{ full_name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [eventDates, setEventDates] = useState<{ start_time: Date; end_time: Date } | null>(null);
+  const [eventDates, setEventDates] = useState<{ start_time: string; end_time: string }[]>([]);
+  const [dateRange, setDateRange] = useState<{ start_time: Date; end_time: Date } | null>(null);
   const [isLoadingDates, setIsLoadingDates] = useState(true);
 
   useEffect(() => {
@@ -113,21 +114,35 @@ export function EventOverview({ event }: EventOverviewProps) {
     }
 
     async function fetchEventDates() {
-      if (!event?.arn) return;
+      if (!event?.id) return;
 
       setIsLoadingDates(true);
       try {
-        const response = await fetch('/api/events/dates', {
+        // Fetch all dates
+        const datesResponse = await fetch('/api/events/dates', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ arn: event.arn }),
+          body: JSON.stringify({ eventId: event.id }),
         });
 
-        if (!response.ok) throw new Error('Failed to fetch event dates');
-        const data = await response.json();
-        setEventDates(data);
+        if (!datesResponse.ok) throw new Error('Failed to fetch event dates');
+        const datesData = await datesResponse.json();
+        setEventDates(datesData);
+
+        // Fetch date range
+        const rangeResponse = await fetch('/api/events/date-range', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ eventId: event.id }),
+        });
+
+        if (!rangeResponse.ok) throw new Error('Failed to fetch event date range');
+        const rangeData = await rangeResponse.json();
+        setDateRange(rangeData);
       } catch (error) {
         console.error('Error fetching event dates:', error);
       } finally {
@@ -137,35 +152,33 @@ export function EventOverview({ event }: EventOverviewProps) {
 
     fetchProjectHeads();
     fetchEventDates();
-  }, [event?.arn]);
+  }, [event?.arn, event?.id]);
 
   if (isLoadingDates) {
     return <EventOverviewSkeleton />;
   }
 
-  if (!eventDates) {
+  if (!eventDates.length) {
     return null;
   }
 
-  const startDate = new Date(eventDates.start_time);
-  const endDate = new Date(eventDates.end_time);
+  const formatDate = (date: string | Date) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
 
-  const formattedStartDate = startDate.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const formattedStartTime = startDate.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  const formattedEndTime = endDate.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const formatTime = (date: string | Date) => {
+    const d = new Date(date);
+    return d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -182,14 +195,18 @@ export function EventOverview({ event }: EventOverviewProps) {
             <h3 className="font-medium text-sm text-muted-foreground mb-1">
               Date & Time
             </h3>
-            <div className="flex items-start gap-2">
-              <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
-              <div>
-                <p>{formattedStartDate}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formattedStartTime} - {formattedEndTime}
-                </p>
-              </div>
+            <div className="space-y-3">
+              {eventDates.map((date, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div>
+                    <p>{formatDate(date.start_time)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatTime(date.start_time)} - {formatTime(date.end_time)}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

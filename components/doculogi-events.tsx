@@ -91,7 +91,7 @@ const statusColorMap = {
 };
 
 const statusLabels = {
-  INIT: 'Initialize',
+  INIT: 'Not Started',
   AVP: 'Drafting',
   SENT: 'Sent for Review',
   DOCU: 'In Review',
@@ -369,10 +369,10 @@ export default function DocuLogiEvents() {
 
   return (
     <>
-      <div className="grid grid-cols-1 divide-y divide-border/50">
+      <div className="grid grid-cols-1 divide-y gap-0 divide-border/50">
         {events.map((event: DocuLogiEvent) => (
-          <div key={event.id} className="py-3">
-            <div className="flex flex-col md:flex-row lg:items-start gap-6 lg:gap-8">
+          <div key={event.id} className="py-1">
+            <div className="flex flex-col md:flex-row lg:items-start gap-6 lg:gap-8 bg-muted/50 p-4 rounded-md">
               {/* Title and ARN */}
               <div className="w-full lg:w-1/4 min-w-0">
                 <div className="space-y-2">
@@ -428,7 +428,7 @@ export default function DocuLogiEvents() {
                       variant="secondary" 
                       className={`w-fit ${statusColorMap[event.preacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
                     >
-                      {statusLabels[event.preacts_status as keyof typeof statusLabels] || event.preacts_status || 'Not submitted'}
+                      {statusLabels[event.preacts_status as keyof typeof statusLabels] || event.preacts_status || 'No Tracker Found'}
                     </Badge>
                   </div>
                 </div>
@@ -476,22 +476,15 @@ export default function DocuLogiEvents() {
                       variant="secondary" 
                       className={`w-fit ${statusColorMap[event.postacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
                     >
-                      {statusLabels[event.postacts_status as keyof typeof statusLabels] || event.postacts_status || 'Not submitted'}
+                      {statusLabels[event.postacts_status as keyof typeof statusLabels] || event.postacts_status || 'No Tracker Found'}
                     </Badge>
                   </div>
                 </div>
               </div>
 
               {/* Manage Requests and Docu Head */}
-              <div className="w-full lg:w-1/4 flex flex-col gap-2 items-end">
-                <Button 
-                  variant="outline" 
-                  className="gap-2 w-fit"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  Manage Requests
-                </Button>
+              <div className="w-full lg:w-1/4 flex flex-col gap-2 items-start">
+                <h4 className="text-sm font-medium text-muted-foreground">DOCU-IN-CHARGE</h4>
                 <Popover 
                   open={openDocuHead === event.id} 
                   onOpenChange={(open) => {

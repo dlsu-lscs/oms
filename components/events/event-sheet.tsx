@@ -13,6 +13,7 @@ import { EventOverview } from "./event-overview";
 import { EventDocumentation } from "./event-documentation";
 import { EventPreregistrations } from "./event-preregistrations";
 import { EventAttendees } from "./event-attendees";
+import { EventFinance } from "./event-finance";
 import { Loader2 } from "lucide-react";
 
 interface EventSidebarProps {
@@ -79,6 +80,7 @@ export function EventSidebar({
               <TabsList className="mb-4">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="documentation">Documentation</TabsTrigger>
+                <TabsTrigger value="finance">Finance</TabsTrigger>
                 <TabsTrigger value="preregistrations">
                   Preregistrations
                 </TabsTrigger>
@@ -100,6 +102,10 @@ export function EventSidebar({
 
               <TabsContent value="documentation">
                 <EventDocumentation event={event} />
+              </TabsContent>
+
+              <TabsContent value="finance">
+                <EventFinance event={event} />
               </TabsContent>
 
               <TabsContent value="preregistrations">

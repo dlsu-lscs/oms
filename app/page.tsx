@@ -6,11 +6,13 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import EventList from "@/components/dashboard-events";
 import DocuLogiEvents from "@/components/doculogi-events";
+import FinanceDashboard from "@/components/finance-dashboard";
 import { Event } from "@/app/types";
 import { useEffect, useState } from "react";
 import EventCardSkeleton from "@/components/event-card-skeleton";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -65,13 +67,12 @@ export default function Dashboard() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 px-4 md:gap-6 md:py-6 md:px-6">
-              <SectionCards />
-              {isDocuLogi && (
-                <>
-                  <div className="text-3xl font-bold">DocuLogi Events</div>
-                  <DocuLogiEvents />
-                </>
-              )}
+              <Tabs defaultValue="events" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="events">Events</TabsTrigger>
+                  <TabsTrigger value="finance">Finance Dashboard</TabsTrigger>
+                </TabsList>
+                <TabsContent value="events" className="mt-6">
               <div className="text-3xl font-bold">Your events</div>
               <div className="relative">
                 <div
@@ -93,6 +94,18 @@ export default function Dashboard() {
                   <EventList events={events} />
                 </div>
               </div>
+              {isDocuLogi && (
+                <>
+                      <div className="text-3xl font-bold mt-8">DocuLogi Events</div>
+                  <DocuLogiEvents />
+                </>
+              )}  
+                </TabsContent>
+                <TabsContent value="finance" className="mt-6">
+                  <div className="text-3xl font-bold">Finance Dashboard</div>
+                  <FinanceDashboard />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </div>

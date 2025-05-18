@@ -13,19 +13,19 @@ import { FileStatus } from "@/app/types";
 
 const statusConfig = {
   INIT: { 
-    label: 'Initialize', 
+    label: 'Not Started', 
     variant: 'secondary' as const,
-    className: 'bg-gray-500 text-white'
+    className: 'bg-grey text-white'
   },
-  SENT: { 
-    label: 'Sent for Review', 
+  DRAFTING: { 
+    label: 'Drafting', 
     variant: 'secondary' as const,
-    className: 'bg-yellow-500 text-white'
+    className: 'bg-muted-foreground text-white'
   },
   DONE: { 
     label: 'Done', 
     variant: 'secondary' as const,
-    className: 'bg-white text-gray-900 border border-gray-200'
+    className: 'bg-white text-gray-900 border'
   },
   REVISE: { 
     label: 'For Revision', 

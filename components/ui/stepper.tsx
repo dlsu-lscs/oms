@@ -4,16 +4,17 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 interface Step {
-    title: string
-    description?: string
+  title: string
+  description?: string
   subtext?: string
-    status: "complete" | "current" | "upcoming"
-    date?: string
+  date?: string
   icon?: React.ReactNode
-    actionButton?: {
-      label: string
-      onClick: () => void
-    }
+  circleClassName?: string
+  circleStyle?: React.CSSProperties
+  actionButton?: {
+    label: string
+    onClick: () => void
+  }
   className?: string
 }
 
@@ -30,59 +31,29 @@ export function Stepper({ steps }: StepperProps) {
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full border-2",
-                step.status === "complete"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : step.status === "current"
-                  ? "border-primary"
-                  : "border-muted-foreground/25"
+                step.circleClassName
               )}
+              style={step.circleStyle}
             >
+              <div className="h-5 w-5 flex items-center justify-center">
               {step.icon || (
-                <span
-                  className={cn(
-                  "text-sm font-medium",
-                    step.status === "current"
-                      ? "text-primary"
-                      : "text-muted-foreground/25"
-                  )}
-                >
-                  {index + 1}
-                </span>
+                <span className="text-sm font-medium text-muted-foreground/25">{index + 1}</span>
               )}
+              </div>
             </div>
             {index < steps.length - 1 && (
-              <div
-                className={cn(
-                  "w-0.5 h-full my-2",
-                  step.status === "complete"
-                    ? "bg-primary"
-                    : "bg-muted-foreground/25"
-                )}
-              />
+              <div className={cn("w-0.5 h-full my-2 bg-muted-foreground/25")} />
             )}
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <h3
-                  className={cn(
-                "text-sm font-medium",
-                    step.status === "current"
-                      ? "text-primary"
-                      : step.className || "text-foreground"
-                  )}
-                >
-                {step.title}
-              </h3>
+                <h3 className={cn("text-sm font-medium", step.className || "text-foreground")}>{step.title}</h3>
                 {step.description && (
                   <div className="space-y-1">
-                    <p className={cn("text-sm", step.className || "text-muted-foreground")}>
-                      {step.description}
-                    </p>
+                    <p className={cn("text-sm", step.className || "text-muted-foreground")}>{step.description}</p>
                     {step.subtext && (
-                      <p className={cn("text-xs", step.className || "text-muted-foreground")}>
-                        {step.subtext}
-                      </p>
+                      <p className={cn("text-xs", step.className || "text-muted-foreground")}>{step.subtext}</p>
                     )}
                     {step.actionButton && (
                       <Button
@@ -101,9 +72,7 @@ export function Stepper({ steps }: StepperProps) {
                 )}
               </div>
               {step.date && (
-                <span className="text-sm text-muted-foreground">
-                  {step.date}
-                </span>
+                <span className="text-sm text-muted-foreground">{step.date}</span>
               )}
             </div>
           </div>

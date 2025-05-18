@@ -1,20 +1,32 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { FileText } from "lucide-react";
+import { FileText, Folder } from "lucide-react";
 
-interface Option {
+interface Option<T = string> {
   label: string;
-  value: string;
+  value: T;
+  disabled?: boolean;
+  isFolder?: boolean;
+  level: number;
+  isLastChild?: boolean;
+  hasChildren?: boolean;
+  parentFolderId?: string;
+  ancestry?: boolean[];
 }
 
-interface MultiselectDropdownProps {
-  options: Option[];
-  value: string[];
-  onChange: (value: string[]) => void;
+interface MultiselectDropdownProps<T = string> {
+  options: Option<T>[];
+  value: T[];
+  onChange: (value: T[]) => void;
   placeholder?: string;
 }
 
-export function MultiselectDropdown({ options, value, onChange, placeholder = "Select..." }: MultiselectDropdownProps) {
+export function MultiselectDropdown<T = string>({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder = "Select..." 
+}: MultiselectDropdownProps<T>) {
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,11 +50,26 @@ export function MultiselectDropdown({ options, value, onChange, placeholder = "S
   }, [containerRef.current, value, search]);
 
   const availableOptions = options.filter(
-    (option) => !value.includes(option.value) && option.label.toLowerCase().includes(search.toLowerCase())
+    (option) => !value.includes(option.value) && 
+    option.label.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Render tree lines using ancestry array
+  const renderTreePrefix = (option: Option<T>) => {
+    if (!option.ancestry) return '';
+    return option.ancestry
+      .slice(0, -1)
+      .map(isLast => (isLast ? '    ' : '│   '))
+      .join('');
+  };
+
+  const renderTreeIcon = (option: Option<T>) => {
+    if (!option.ancestry || option.ancestry.length === 0) return '';
+    return option.ancestry[option.ancestry.length - 1] ? '└─ ' : '├─ ';
+  };
+
   return (
-    <div className="relative w-1/2" ref={containerRef}>
+    <div className="relative w-[420px]" ref={containerRef}>
       <div
         className={`flex items-center border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px] gap-2 flex-wrap cursor-text`}
         onClick={() => {
@@ -51,10 +78,11 @@ export function MultiselectDropdown({ options, value, onChange, placeholder = "S
         }}
       >
         {value.map((val) => {
-          const label = options.find((o) => o.value === val)?.label || val;
+          const option = options.find((o) => o.value === val);
           return (
-            <Badge key={val} className="flex items-center gap-1 text-xs px-2 py-0.5 bg-white text-black border border-border">
-              {label}
+            <Badge key={String(val)} className="flex items-center gap-1 text-xs px-2 py-0.5 bg-white text-black border border-border">
+              {option?.isFolder ? <Folder className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+              {option?.label || String(val)}
               <button
                 type="button"
                 className="ml-1 text-xs text-muted-foreground hover:text-foreground"
@@ -81,20 +109,28 @@ export function MultiselectDropdown({ options, value, onChange, placeholder = "S
       {focused && availableOptions.length > 0 && (
         <div
           className="absolute z-10 left-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto text-sm"
-          style={dropdownWidth ? { width: dropdownWidth } : {}}
+          style={dropdownWidth ? { width: 420 } : {}}
         >
           {availableOptions.map((option) => (
             <div
-              key={option.value}
-              className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent whitespace-nowrap"
+              key={String(option.value)}
+              className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent whitespace-pre ${
+                option.disabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
               onClick={() => {
-                onChange([...value, option.value]);
-                setSearch("");
-                inputRef.current?.focus();
+                if (!option.disabled) {
+                  onChange([...value, option.value]);
+                  setSearch("");
+                  inputRef.current?.focus();
+                }
               }}
             >
-              <span>{option.label}</span>
-              <FileText className="w-4 h-4 ml-2 text-muted-foreground" />
+              <span className="flex items-center gap-2 font-mono">
+                {renderTreePrefix(option)}
+                {renderTreeIcon(option)}
+                {option.isFolder ? <Folder className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                {option.label}
+              </span>
             </div>
           ))}
         </div>

@@ -16,6 +16,11 @@ export interface UserEvent {
   objectives: string;
   strategies: string;
   measures: string;
+  fin_preacts_deadline?: Date;
+  fin_postacts_deadline?: Date;
+  fin_head_id?: number;
+  fin_head_fullname?: string;
+  fin_head_email?: string;
 }
 
 interface UserEventQueryResult extends RowDataPacket {
@@ -173,15 +178,16 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
         e.strategies AS 'strategies',
         e.measures AS 'measures'
       FROM events e
-      JOIN event_heads eh ON e.id = eh.event_id
-      JOIN event_durations ed ON e.duration_id = ed.id
-      JOIN event_natures en ON e.nature_id = en.id
-      JOIN committees ec ON e.committee_id = ec.committee_id
-      JOIN members m ON eh.member_id = m.id
-      JOIN positions p ON m.position_id = p.position_id
-      JOIN committees c ON m.committee_id = c.committee_id
-      WHERE eh.member_id = ?`,
-      [memberId]
+      LEFT JOIN event_heads eh ON e.id = eh.event_id
+      LEFT JOIN event_durations ed ON e.duration_id = ed.id
+      LEFT JOIN event_natures en ON e.nature_id = en.id
+      LEFT JOIN committees ec ON e.committee_id = ec.committee_id
+      LEFT JOIN members m ON eh.member_id = m.id
+      LEFT JOIN positions p ON m.position_id = p.position_id
+      LEFT JOIN committees c ON m.committee_id = c.committee_id
+      WHERE eh.member_id = ? OR e.docu_head = ? OR e.fin_head = ?
+      GROUP BY e.id;`,
+      [memberId, memberId, memberId]
     ) as [UserEventQueryResult[], FieldPacket[]];
 
     return (rows as UserEventQueryResult[]).map(row => ({
@@ -189,6 +195,68 @@ export async function getUserEvents(memberId: number): Promise<UserEvent[]> {
     }));
   } catch (error) {
     console.error("Error fetching user events:", error);
+    return [];
+  }
+}
+
+export interface FinanceEvent {
+  id: number;
+  arn: string;
+  event_name: string;
+  budget_allocation: number;
+  fin_head_id: number;
+  fin_head_fullname: string;
+  fin_head_email: string;
+  fin_preacts_deadline: Date | null;
+  fin_preacts_status: string;
+  fin_postacts_deadline: Date | null;
+  fin_postacts_status: string;
+}
+
+interface FinanceEventQueryResult extends RowDataPacket {
+  id: number;
+  arn: string;
+  event_name: string;
+  budget_allocation: number;
+  fin_head_id: number;
+  fin_head_fullname: string;
+  fin_head_email: string;
+  fin_preacts_deadline: string | null;
+  fin_preacts_status: string;
+  fin_postacts_deadline: string | null;
+  fin_postacts_status: string;
+}
+
+export async function getFinanceEvents(memberId: number): Promise<FinanceEvent[]> {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT 
+        e.id AS 'id',
+        e.arn AS 'arn',
+        e.name AS 'event_name',
+        e.budget_allocation AS 'budget_allocation',
+        e.fin_head AS 'fin_head_id',
+        m_fin.full_name AS 'fin_head_fullname',
+        m_fin.email AS 'fin_head_email',
+        et.fin_preacts_deadline AS 'fin_preacts_deadline',
+        et.fin_preacts_status AS 'fin_preacts_status',
+        et.fin_postacts_deadline AS 'fin_postacts_deadline',
+        et.fin_postacts_status AS 'fin_postacts_status'
+      FROM events e
+      LEFT JOIN event_trackers et ON e.id = et.event_id
+      LEFT JOIN members m_fin ON e.fin_head = m_fin.id
+      WHERE e.term_id = ?
+        GROUP BY e.id;`,
+      [process.env.CURRENT_TERM_ID!]
+    ) as [FinanceEventQueryResult[], FieldPacket[]];
+
+    return (rows as FinanceEventQueryResult[]).map(row => ({
+      ...row,
+      fin_preacts_deadline: row.fin_preacts_deadline ? new Date(row.fin_preacts_deadline) : null,
+      fin_postacts_deadline: row.fin_postacts_deadline ? new Date(row.fin_postacts_deadline) : null
+    }));
+  } catch (error) {
+    console.error("Error fetching finance events:", error);
     return [];
   }
 }

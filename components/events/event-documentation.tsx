@@ -19,8 +19,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle, FileText, ExternalLink, Calendar } from "lucide-react";
-import { Event, FileStatus, fileStatuses } from "@/app/types";
+import { Copy, CheckCircle, Loader2, Circle, CircleCheck, AlertCircle, FileText, ExternalLink, Calendar, Pencil, UserRoundPen, FilePen, FileClock, FileCog, FileWarning, FilePenLine, FileCheck } from "lucide-react";
+import { Event, FileStatus, fileStatuses, DocumentationStatus, documentationStatuses, documentationStatusLabels } from "@/app/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MultiselectDropdown } from "@/components/ui/MultiselectDropdown";
 import { PreActsTemplatesSkeleton } from "@/components/events/PreActsTemplatesSkeleton";
@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 interface EventDocumentationProps {
   event: Event;
@@ -88,7 +89,7 @@ const statusColorMap = {
 };
 
 const statusLabels = {
-  INIT: 'Initialize',
+  INIT: 'Not Started',
   AVP: 'Drafting',
   SENT: 'Sent for Review',
   DOCU: 'In Review',
@@ -111,6 +112,153 @@ const statusLabels = {
   HOLD: 'On Hold',
   CANCELLED: 'Cancelled',
 };
+
+// Update the stepperStatusConfig
+const stepperStatusConfig: Record<DocumentationStatus, {
+  icon: LucideIcon;
+  message: string;
+  color: string;
+  circleClassName: string;
+}> = {
+  // Initial states
+  INIT: {
+    icon: Circle,
+    message: "The documentation team is currently initializing the documents.",
+    color: "text-muted-primary",
+    circleClassName: "border-primary bg-grey text-muted-primary"
+  },
+  AVP: {
+    icon: FilePen,
+    message: "The project heads can now draft the documents.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  SENT: {
+    icon: FileClock,
+    message: "The documentation team can now review the documents.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  DOCU: {
+    icon: FileCog,
+    message: "The documentation team is currently reviewing the documents.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  REVISE: {
+    icon: FileWarning,
+    message: "The documentation team has requested revisions to the documents.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  SIGNATURES: {
+    icon: FilePenLine,
+    message: "The documentation team is currently collecting signatures from the event heads.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  SUBMITTED: {
+    icon: FileCheck,
+    message: "The documents have been submitted to CSO/SLIFE.",
+    color: "text-primary",
+    circleClassName: "border-primary bg-muted-primary text-primary"
+  },
+  // Incentive states
+  FULLINCENTIVE: {
+    icon: CheckCircle,
+    message: "The documents have been approved and the incentive has been awarded.",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  HALFINCENTIVE: {
+    icon: CheckCircle,
+    message: "Half Incentive",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  // Approval states
+  EARLYAPPROVAL: {
+    icon: CheckCircle,
+    message: "Early Approved",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  LATEAPPROVAL: {
+    icon: CheckCircle,
+    message: "Late Approved",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  // Completion states
+  EARLYCOMP: {
+    icon: CircleCheck,
+    message: "Early Complete",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  EARLYINC: {
+    icon: AlertCircle,
+    message: "Early Incomplete",
+    color: "text-orange-500",
+    circleClassName: "border-orange-500 bg-orange-500 text-white"
+  },
+  LATECOMP: {
+    icon: CheckCircle,
+    message: "Late Complete",
+    color: "text-green-500",
+    circleClassName: "border-green-500 bg-green-500 text-white"
+  },
+  LATEINC: {
+    icon: AlertCircle,
+    message: "Late Incomplete",
+    color: "text-orange-500",
+    circleClassName: "border-orange-500 bg-orange-500 text-white"
+  },
+  // Special states
+  SPECIAL: {
+    icon: Circle,
+    message: "Special",
+    color: "text-gray-400",
+    circleClassName: "border-gray-300 bg-white text-gray-400"
+  },
+  DEFAULT: {
+    icon: Circle,
+    message: "Default",
+    color: "text-gray-400",
+    circleClassName: "border-gray-300 bg-white text-gray-400"
+  },
+  PENDED: {
+    icon: Circle,
+    message: "Pending",
+    color: "text-gray-400",
+    circleClassName: "border-gray-300 bg-white text-gray-400"
+  },
+  UNCPEND: {
+    icon: Circle,
+    message: "Uncounted Pend",
+    color: "text-gray-400",
+    circleClassName: "border-gray-300 bg-white text-gray-400"
+  },
+  // Negative states
+  DENIED: {
+    icon: AlertCircle,
+    message: "Denied",
+    color: "text-red-500",
+    circleClassName: "border-red-500 bg-red-500 text-white"
+  },
+  HOLD: {
+    icon: AlertCircle,
+    message: "On Hold",
+    color: "text-orange-500",
+    circleClassName: "border-orange-500 bg-orange-500 text-white"
+  },
+  CANCELLED: {
+    icon: AlertCircle,
+    message: "Cancelled",
+    color: "text-red-500",
+    circleClassName: "border-red-500 bg-red-500 text-white"
+  }
+} as const;
 
 const validateStatus = (status: string | null): FileStatus => {
   if (fileStatuses.includes(status as FileStatus)) {
@@ -644,13 +792,13 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Track your Pre-Acts progress here. Upload and manage your Pre-Acts documents, and monitor their status.
             {preactsDeadline && (
               <span className="flex items-center gap-1 mt-1">
                 <Calendar className="h-4 w-4" />
                 <span className="font-medium">Deadline: {format(new Date(preactsDeadline), 'MMMM d, yyyy')}</span>
               </span>
             )}
+            Track your Pre-Acts progress here. Upload and manage your Pre-Acts documents, and monitor their status.
           </p>
 
           {isLoadingPreactsFiles ? (
@@ -905,27 +1053,32 @@ export function EventDocumentation({ event }: EventDocumentationProps) {
               steps={[
                 {
                   title: "Pre-Acts",
-                  description: "Initial project documentation and planning",
-                  status: "complete",
-                  date: "2024-03-15",
+                  description: stepperStatusConfig[preactsStatus as DocumentationStatus]?.message || "Initialize",
+                  date: preactsDeadline ? format(new Date(preactsDeadline), 'MMM d, yyyy') : "No deadline set",
+                  icon: React.createElement(stepperStatusConfig[preactsStatus as DocumentationStatus]?.icon || Circle, {
+                    className: stepperStatusConfig[preactsStatus as DocumentationStatus]?.color || "text-gray-400"
+                  }),
+                  circleClassName: stepperStatusConfig[preactsStatus as DocumentationStatus]?.circleClassName || "border-gray-300 bg-white text-gray-400"
                 },
                 {
                   title: "Event Day",
                   description: "Event execution and documentation",
-                  status: "current",
-                  date: "2024-04-01"
+                  date: dateRange?.start_time ? format(new Date(dateRange.start_time), 'MMM d, yyyy') : "Not scheduled",
+                  icon: React.createElement(CircleCheck, {
+                    className: dateRange?.start_time && new Date(dateRange.start_time) <= new Date() ? "text-black" : "text-gray-400"
+                  }),
+                  circleClassName: dateRange?.start_time && new Date(dateRange.start_time) <= new Date()
+                    ? "border-black bg-white text-black"
+                    : "border-gray-300 bg-white text-gray-400"
                 },
                 {
                   title: "Post-Acts",
-                  description: "Post-event documentation and reports",
-                  status: "upcoming",
-                  date: "2024-04-02"
-                },
-                {
-                  title: "CSO Evaluation",
-                  description: "Final evaluation and feedback",
-                  status: "upcoming",
-                  date: "2024-04-15"
+                  description: stepperStatusConfig[postactsStatus as DocumentationStatus]?.message || "Initialize",
+                  date: postactsDeadline ? format(new Date(postactsDeadline), 'MMM d, yyyy') : "No deadline set",
+                  icon: React.createElement(stepperStatusConfig[postactsStatus as DocumentationStatus]?.icon || Circle, {
+                    className: stepperStatusConfig[postactsStatus as DocumentationStatus]?.color || "text-gray-400"
+                  }),
+                  circleClassName: stepperStatusConfig[postactsStatus as DocumentationStatus]?.circleClassName || "border-gray-300 bg-white text-gray-400"
                 }
               ]}
             />

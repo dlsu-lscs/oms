@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Input } from "./ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { useSession } from "next-auth/react";
+import { useEventSheet } from "./event-sheet";
+import { EventSidebar } from "./events/event-sheet";
+import { Event } from "@/app/types";
 
 interface Member {
   id: number;
@@ -31,6 +34,14 @@ interface FinanceEvent {
   fin_preacts_status: string;
   fin_postacts_deadline: Date | null;
   fin_postacts_status: string;
+  duration: string;
+  type: string;
+  nature: string;
+  brief_description: string;
+  goals: string;
+  objectives: string;
+  strategies: string;
+  measures: string;
 }
 
 const months = [
@@ -156,7 +167,9 @@ export default function FinanceDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
   const [openDatePicker, setOpenDatePicker] = useState<{ id: number; type: 'fin_preacts' | 'fin_postacts' } | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const { data: session } = useSession();
+  const { openEventSheet } = useEventSheet();
 
   useEffect(() => {
     async function fetchEvents() {
@@ -282,6 +295,31 @@ export default function FinanceDashboard() {
     }
   };
 
+  const handleEventClick = (event: FinanceEvent) => {
+    const eventData: Event = {
+      id: event.id,
+      arn: event.arn,
+      event_name: event.event_name,
+      title: event.event_name,
+      description: event.brief_description || '',
+      start_date: new Date().toISOString(),
+      end_date: new Date().toISOString(),
+      status: '',
+      committee_id: '',
+      committee: '',
+      duration: event.duration,
+      type: event.type,
+      nature: event.nature,
+      budget_allocation: event.budget_allocation,
+      brief_description: event.brief_description,
+      goals: event.goals,
+      objectives: event.objectives,
+      strategies: event.strategies,
+      measures: event.measures
+    };
+    setSelectedEvent(eventData);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -291,216 +329,229 @@ export default function FinanceDashboard() {
   }
 
   return (
-    <div className="grid grid-cols-1 divide-y gap-0 divide-border/50">
-      {events.map((event: FinanceEvent) => (
-        <div key={event.id} className="py-1">
-          <div className="flex flex-col md:flex-row lg:items-start gap-6 lg:gap-8 bg-muted/50 p-4 rounded-md">
-            {/* Title and ARN */}
-            <div className="w-full lg:w-1/4 min-w-0">
-              <div className="space-y-2">
-                <h3 className="text-base text-lg font-medium line-clamp-2">
-                  {event.event_name}
-                </h3>
-                <Badge variant="outline" className="text-xs w-fit">{event.arn}</Badge>
-                <div className="text-sm font-medium">
-                  ₱{event.budget_allocation?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+    <>
+      <div className="grid grid-cols-1 divide-y gap-0 divide-border/50">
+        {events.map((event: FinanceEvent) => (
+          <div key={event.id} className="py-1">
+            <div className="flex flex-col md:flex-row lg:items-start gap-6 lg:gap-8 bg-muted/50 p-4 rounded-md">
+              {/* Title and ARN */}
+              <div className="w-full lg:w-1/4 min-w-0">
+                <div className="space-y-2">
+                  <h3 
+                    className="text-base text-lg font-medium line-clamp-2 cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => handleEventClick(event)}
+                  >
+                    {event.event_name}
+                  </h3>
+                  <Badge variant="outline" className="text-xs w-fit">{event.arn}</Badge>
+                  <div className="text-sm font-medium">
+                    ₱{event.budget_allocation?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Finance Preacts */}
-            <div className="w-full lg:w-1/4">
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">FINANCE PREACTS DEADLINE</h4>
-                <div className="flex flex-col gap-2">
-                  {event.fin_preacts_deadline ? (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-md w-fit">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{formatDate(event.fin_preacts_deadline)}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDateSelect(event.id, 'fin_preacts', '');
-                        }}
-                        className="p-1 hover:bg-destructive/10 rounded-sm"
-                      >
-                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  ) : (
-                    <Popover 
-                      open={openDatePicker?.id === event.id && openDatePicker?.type === 'fin_preacts'}
-                      onOpenChange={(open) => setOpenDatePicker(open ? { id: event.id, type: 'fin_preacts' } : null)}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 px-2 w-fit">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0">
-                        <DatePickerPopover
-                          currentDate={event.fin_preacts_deadline}
-                          onDateSelect={(date) => handleDateSelect(event.id, 'fin_preacts', date)}
-                          onClose={() => setOpenDatePicker(null)}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                  <Badge 
-                    variant="secondary" 
-                    className={`w-fit ${statusColorMap[event.fin_preacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
-                  >
-                    {statusLabels[event.fin_preacts_status as keyof typeof statusLabels] || event.fin_preacts_status || 'No Tracker Found'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Finance Postacts */}
-            <div className="w-full lg:w-1/4">
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">FINANCE POSTACTS DEADLINE</h4>
-                <div className="flex flex-col gap-2">
-                  {event.fin_postacts_deadline ? (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-md w-fit">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{formatDate(event.fin_postacts_deadline)}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDateSelect(event.id, 'fin_postacts', '');
-                        }}
-                        className="p-1 hover:bg-destructive/10 rounded-sm"
-                      >
-                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  ) : (
-                    <Popover 
-                      open={openDatePicker?.id === event.id && openDatePicker?.type === 'fin_postacts'}
-                      onOpenChange={(open) => setOpenDatePicker(open ? { id: event.id, type: 'fin_postacts' } : null)}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 px-2 w-fit">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0">
-                        <DatePickerPopover
-                          currentDate={event.fin_postacts_deadline}
-                          onDateSelect={(date) => handleDateSelect(event.id, 'fin_postacts', date)}
-                          onClose={() => setOpenDatePicker(null)}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                  <Badge 
-                    variant="secondary" 
-                    className={`w-fit ${statusColorMap[event.fin_postacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
-                  >
-                    {statusLabels[event.fin_postacts_status as keyof typeof statusLabels] || event.fin_postacts_status || 'No Tracker Found'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Finance Head */}
-            <div className="w-full lg:w-1/4 flex flex-col gap-2 items-start">
-              <h4 className="text-sm font-medium text-muted-foreground">FINANCE HEAD</h4>
-              <Popover 
-                open={openFinHead === event.id} 
-                onOpenChange={(open) => {
-                  setOpenFinHead(open ? event.id : null);
-                  if (!open) {
-                    setSearchQuery('');
-                    setFilteredMembers([]);
-                  }
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-fit justify-between"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {event.fin_head_fullname ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {event.fin_head_fullname.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate">{event.fin_head_fullname}</span>
+              {/* Finance Preacts */}
+              <div className="w-full lg:w-1/4">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">FINANCE PREACTS DEADLINE</h4>
+                  <div className="flex flex-col gap-2">
+                    {event.fin_preacts_deadline ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-md w-fit">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{formatDate(event.fin_preacts_deadline)}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDateSelect(event.id, 'fin_preacts', '');
+                          }}
+                          className="p-1 hover:bg-destructive/10 rounded-sm"
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                        </button>
                       </div>
                     ) : (
-                      "Select finance head..."
+                      <Popover 
+                        open={openDatePicker?.id === event.id && openDatePicker?.type === 'fin_preacts'}
+                        onOpenChange={(open) => setOpenDatePicker(open ? { id: event.id, type: 'fin_preacts' } : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-8 px-2 w-fit">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <DatePickerPopover
+                            currentDate={event.fin_preacts_deadline}
+                            onDateSelect={(date) => handleDateSelect(event.id, 'fin_preacts', date)}
+                            onClose={() => setOpenDatePicker(null)}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0">
-                  <div className="flex items-center border-b px-3">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <input
-                      className="flex h-8 w-full rounded-md bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="Search finance head..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                    <Badge 
+                      variant="secondary" 
+                      className={`w-fit ${statusColorMap[event.fin_preacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
+                    >
+                      {statusLabels[event.fin_preacts_status as keyof typeof statusLabels] || event.fin_preacts_status || 'No Tracker Found'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Finance Postacts */}
+              <div className="w-full lg:w-1/4">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">FINANCE POSTACTS DEADLINE</h4>
+                  <div className="flex flex-col gap-2">
+                    {event.fin_postacts_deadline ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-md w-fit">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{formatDate(event.fin_postacts_deadline)}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDateSelect(event.id, 'fin_postacts', '');
+                          }}
+                          className="p-1 hover:bg-destructive/10 rounded-sm"
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    ) : (
+                      <Popover 
+                        open={openDatePicker?.id === event.id && openDatePicker?.type === 'fin_postacts'}
+                        onOpenChange={(open) => setOpenDatePicker(open ? { id: event.id, type: 'fin_postacts' } : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-8 px-2 w-fit">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <DatePickerPopover
+                            currentDate={event.fin_postacts_deadline}
+                            onDateSelect={(date) => handleDateSelect(event.id, 'fin_postacts', date)}
+                            onClose={() => setOpenDatePicker(null)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    <Badge 
+                      variant="secondary" 
+                      className={`w-fit ${statusColorMap[event.fin_postacts_status as keyof typeof statusColorMap] || 'bg-gray-500 text-white'}`}
+                    >
+                      {statusLabels[event.fin_postacts_status as keyof typeof statusLabels] || event.fin_postacts_status || 'No Tracker Found'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Finance Head */}
+              <div className="w-full lg:w-1/4 flex flex-col gap-2 items-start">
+                <h4 className="text-sm font-medium text-muted-foreground">FINANCE HEAD</h4>
+                <Popover 
+                  open={openFinHead === event.id} 
+                  onOpenChange={(open) => {
+                    setOpenFinHead(open ? event.id : null);
+                    if (!open) {
+                      setSearchQuery('');
+                      setFilteredMembers([]);
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-fit justify-between"
                       onClick={(e) => e.stopPropagation()}
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSearchQuery('');
-                        }}
-                        className="ml-2 p-1 hover:bg-accent rounded-sm"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-[300px] overflow-y-auto">
-                    {searchQuery.length < 3 ? (
-                      <div className="py-4 text-center text-sm text-muted-foreground">
-                        Type at least 3 characters to search
-                      </div>
-                    ) : filteredMembers.length > 0 ? (
-                      <div className="p-1">
-                        {filteredMembers.map((member) => (
-                          <button
-                            key={member.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFinHeadAssign(event.id, member.id);
-                            }}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {member.full_name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col flex-1 min-w-0 text-left">
-                              <span className="truncate">{member.full_name}</span>
-                              <span className="text-xs text-muted-foreground truncate">{member.email}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-4 text-center text-sm text-muted-foreground">
-                        No results found
-                      </div>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                    >
+                      {event.fin_head_fullname ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {event.fin_head_fullname.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate">{event.fin_head_fullname}</span>
+                        </div>
+                      ) : (
+                        "Select finance head..."
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <input
+                        className="flex h-8 w-full rounded-md bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Search finance head..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSearchQuery('');
+                          }}
+                          className="ml-2 p-1 hover:bg-accent rounded-sm"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {searchQuery.length < 3 ? (
+                        <div className="py-4 text-center text-sm text-muted-foreground">
+                          Type at least 3 characters to search
+                        </div>
+                      ) : filteredMembers.length > 0 ? (
+                        <div className="p-1">
+                          {filteredMembers.map((member) => (
+                            <button
+                              key={member.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFinHeadAssign(event.id, member.id);
+                              }}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
+                            >
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {member.full_name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <span className="truncate">{member.full_name}</span>
+                                <span className="text-xs text-muted-foreground truncate">{member.email}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-sm text-muted-foreground">
+                          No results found
+                        </div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      <EventSidebar
+        open={!!selectedEvent}
+        event={selectedEvent}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEvent(null);
+        }}
+      />
+    </>
   );
 } 

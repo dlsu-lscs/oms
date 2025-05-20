@@ -5,18 +5,20 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
   IconDashboard,
-  IconDatabase,
-  IconFileWord,
   IconHelp,
-  IconLink,
-  IconListDetails,
-  IconReport,
-  IconReportAnalytics,
-  IconSearch,
   IconSettings,
-  IconUsers,
   IconChevronDown,
   IconUpload,
+  IconFileText,
+  IconLink,
+  IconBrandFacebook,
+  IconBrandInstagram,
+  IconBrandYoutube,
+  IconBrandSpotify,
+  IconBrandGoogleDrive,
+  IconFileDescription,
+  IconClipboardCheck,
+  type Icon,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -33,6 +35,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -47,25 +51,56 @@ const navMain = [
     url: "/",
     icon: IconDashboard,
   },
+];
+
+const activityTools = [
   {
-    title: "Events",
-    url: "/events",
-    icon: IconListDetails,
+    name: "Publicity Requests",
+    url: "/publicity-requests",
+    icon: IconFileDescription,
   },
   {
-    title: "Links",
-    url: "/links",
+    name: "Permit Requests",
+    url: "/permit-requests",
+    icon: IconClipboardCheck,
+  },
+  {
+    name: "Manage Links",
+    url: "/manage-links",
     icon: IconLink,
   },
+];
+
+const platforms = [
   {
-    title: "Analytics",
-    url: "/analytics",
-    icon: IconReportAnalytics,
+    name: "Facebook Page",
+    url: "/platforms/facebook-page",
+    icon: IconBrandFacebook,
   },
   {
-    title: "Team",
-    url: "/team",
-    icon: IconUsers,
+    name: "Facebook Group",
+    url: "/platforms/facebook-group",
+    icon: IconBrandFacebook,
+  },
+  {
+    name: "Instagram",
+    url: "/platforms/instagram",
+    icon: IconBrandInstagram,
+  },
+  {
+    name: "Youtube",
+    url: "/platforms/youtube",
+    icon: IconBrandYoutube,
+  },
+  {
+    name: "Spotify",
+    url: "/platforms/spotify",
+    icon: IconBrandSpotify,
+  },
+  {
+    name: "Google Drive",
+    url: "/platforms/google-drive",
+    icon: IconBrandGoogleDrive,
   },
 ];
 
@@ -80,30 +115,53 @@ const navSecondary = [
     url: "/help",
     icon: IconHelp,
   },
-  {
-    title: "Search",
-    url: "/search",
-    icon: IconSearch,
-  },
 ];
 
 const documents = [
   {
     name: "Data Library",
     url: "/data-library",
-    icon: IconDatabase,
+    icon: IconFileText,
   },
   {
     name: "Reports",
     url: "/reports",
-    icon: IconReport,
+    icon: IconFileText,
   },
   {
     name: "Word Assistant",
     url: "/word-assistant",
-    icon: IconFileWord,
+    icon: IconFileText,
   },
 ];
+
+function NavPlatforms({
+  items,
+}: {
+  items: {
+    name: string;
+    url: string;
+    icon: Icon;
+  }[];
+}) {
+  return (
+    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+      <SidebarGroupLabel>Platforms</SidebarGroupLabel>
+      <SidebarMenu>
+        {items.map((item) => (
+          <SidebarMenuItem key={item.name}>
+            <SidebarMenuButton asChild>
+              <a href={item.url}>
+                <item.icon />
+                <span>{item.name}</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
@@ -120,12 +178,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
               <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
+                <SidebarMenuButton
                   className="data-[slot=sidebar-menu-button]:!p-1.5 flex items-center justify-between w-full"
-            >
-                <span className="text-base font-semibold">
-                  La Salle Computer Society
-                </span>
+                >
+                  <span className="text-base font-semibold">
+                    La Salle Computer Society
+                  </span>
                   <IconChevronDown className="w-4 h-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -140,7 +198,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Link href="/settings" className="flex items-center gap-2">
                     <IconSettings className="w-4 h-4" />
                     Organization Settings
-              </Link>
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -149,7 +207,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavDocuments items={documents} />
+        <NavDocuments items={activityTools} />
+        <NavPlatforms items={platforms} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

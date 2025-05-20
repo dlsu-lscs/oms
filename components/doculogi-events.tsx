@@ -338,6 +338,7 @@ export default function DocuLogiEvents() {
 
   const handleEventClick = (event: DocuLogiEvent) => {
     const eventData: Event = {
+      title: event.title,
       id: event.id,
       arn: event.arn,
       event_name: event.event_name,

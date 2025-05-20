@@ -211,6 +211,14 @@ export interface FinanceEvent {
   fin_preacts_status: string;
   fin_postacts_deadline: Date | null;
   fin_postacts_status: string;
+  duration: string;
+  type: string;
+  nature: string;
+  brief_description: string;
+  goals: string;
+  objectives: string;
+  strategies: string;
+  measures: string;
 }
 
 interface FinanceEventQueryResult extends RowDataPacket {
@@ -225,6 +233,14 @@ interface FinanceEventQueryResult extends RowDataPacket {
   fin_preacts_status: string;
   fin_postacts_deadline: string | null;
   fin_postacts_status: string;
+  duration: string;
+  type: string;
+  nature: string;
+  brief_description: string;
+  goals: string;
+  objectives: string;
+  strategies: string;
+  measures: string;
 }
 
 export async function getFinanceEvents(memberId: number): Promise<FinanceEvent[]> {
@@ -241,10 +257,20 @@ export async function getFinanceEvents(memberId: number): Promise<FinanceEvent[]
         et.fin_preacts_deadline AS 'fin_preacts_deadline',
         et.fin_preacts_status AS 'fin_preacts_status',
         et.fin_postacts_deadline AS 'fin_postacts_deadline',
-        et.fin_postacts_status AS 'fin_postacts_status'
+        et.fin_postacts_status AS 'fin_postacts_status',
+        ed.name AS 'duration',
+        e.type AS 'type',
+        en.name AS 'nature',
+        e.brief_description AS 'brief_description',
+        e.goals AS 'goals',
+        e.objectives AS 'objectives',
+        e.strategies AS 'strategies',
+        e.measures AS 'measures'
       FROM events e
       LEFT JOIN event_trackers et ON e.id = et.event_id
       LEFT JOIN members m_fin ON e.fin_head = m_fin.id
+      LEFT JOIN event_durations ed ON e.duration_id = ed.id
+      LEFT JOIN event_natures en ON e.nature_id = en.id
       WHERE e.term_id = ?
         GROUP BY e.id;`,
       [process.env.CURRENT_TERM_ID!]

@@ -12,12 +12,19 @@ import { useEffect, useState } from "react";
 import EventCardSkeleton from "@/components/event-card-skeleton";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+interface UserData {
+  id: string;
+  name: string | null;
+  email: string | null;
+  committeeId: string | null;
+}
 
 export default function Dashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDocuLogi, setIsDocuLogi] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -36,21 +43,33 @@ export default function Dashboard() {
       }
     }
 
-    async function checkCommittee() {
-      if (session?.user?.memberId) {
-        try {
-          const response = await fetch('/api/events/doculogi');
-          setIsDocuLogi(response.ok);
-        } catch (error) {
-          console.error('Error checking committee:', error);
-          setIsDocuLogi(false);
+    async function fetchUserData() {
+      if (!session) {
+        setLoadingUser(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/user');
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
         }
+        const data = await response.json();
+        setUserData(data.user);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      } finally {
+        setLoadingUser(false);
       }
     }
 
     fetchEvents();
-    checkCommittee();
-  }, [session?.user?.memberId]);
+    fetchUserData();
+  }, [session]);
+
+  const isCommitteeMember = (committeeId: string) => {
+    return userData?.committeeId === committeeId;
+  };
 
   return (
     <SidebarProvider
@@ -67,12 +86,6 @@ export default function Dashboard() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 px-4 md:gap-6 md:py-6 md:px-6">
-              <Tabs defaultValue="events" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="events">Events</TabsTrigger>
-                  <TabsTrigger value="finance">Finance Dashboard</TabsTrigger>
-                </TabsList>
-                <TabsContent value="events" className="mt-6">
               <div className="text-3xl font-bold">Your events</div>
               <div className="relative">
                 <div
@@ -94,18 +107,36 @@ export default function Dashboard() {
                   <EventList events={events} />
                 </div>
               </div>
-              {isDocuLogi && (
+
+              {isCommitteeMember('DOCULOGI') && (
                 <>
-                      <div className="text-3xl font-bold mt-8">DocuLogi Events</div>
+                  <div className="text-3xl font-bold mt-8">Documentation and Logistics Dashboard</div>
                   <DocuLogiEvents />
                 </>
-              )}  
-                </TabsContent>
-                <TabsContent value="finance" className="mt-6">
-                  <div className="text-3xl font-bold">Finance Dashboard</div>
+              )}
+
+              {loadingUser ? (
+                <>
+                  <div className="text-3xl font-bold mt-8">Finance Dashboard</div>
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="rounded-lg border p-6 animate-pulse">
+                        <div className="h-6 w-48 bg-muted rounded mb-4" />
+                        <div className="space-y-3">
+                          <div className="h-4 w-full bg-muted rounded" />
+                          <div className="h-4 w-3/4 bg-muted rounded" />
+                          <div className="h-4 w-1/2 bg-muted rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : isCommitteeMember('FIN') && (
+                <>
+                  <div className="text-3xl font-bold mt-8">Finance Dashboard</div>
                   <FinanceDashboard />
-                </TabsContent>
-              </Tabs>
+                </>
+              )}
             </div>
           </div>
         </div>
